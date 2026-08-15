@@ -18,7 +18,7 @@ export default function EditorPage() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      <main className="flex flex-1 items-center justify-center text-muted-foreground">
+      <main className="flex flex-1 items-center justify-center text-copy-muted">
         Canvas
       </main>
     </div>

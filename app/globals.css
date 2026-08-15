@@ -5,8 +5,26 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
+    --font-heading: var(--font-geist-sans);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+    --color-base: var(--bg-base);
+    --color-surface: var(--bg-surface);
+    --color-elevated: var(--bg-elevated);
+    --color-subtle: var(--bg-subtle);
+    --color-surface-border: var(--border-default);
+    --color-surface-border-subtle: var(--border-subtle);
+    --color-copy-primary: var(--text-primary);
+    --color-copy-secondary: var(--text-secondary);
+    --color-copy-muted: var(--text-muted);
+    --color-copy-faint: var(--text-faint);
+    --color-brand: var(--accent-primary);
+    --color-accent-dim: var(--accent-primary-dim);
+    --color-ai: var(--accent-ai);
+    --color-ai-text: var(--accent-ai-text);
+    --color-error: var(--state-error);
+    --color-success: var(--state-success);
+    --color-warning: var(--state-warning);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,73 +65,88 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+/*
+ * Dark only — no light mode (see context/ui-context.md#theme). Both :root
+ * and .dark carry identical values: .dark always wins on <html> (it's
+ * forced on in app/layout.tsx), :root exists only as a same-value fallback
+ * so nothing renders unstyled if that class is ever missing.
+ */
+:root,
+.dark {
+    /* Raw palette (context/ui-context.md#colors) */
+    --bg-base: #080809;
+    --bg-surface: #111114;
+    --bg-elevated: #18181c;
+    --bg-subtle: #1e1e23;
+    --border-default: #2a2a30;
+    --border-subtle: #3a3a42;
+    --text-primary: #f0f0f4;
+    --text-secondary: #c0c0cc;
+    --text-muted: #808090;
+    --text-faint: #505060;
+    --accent-primary: #00c8d4;
+    --accent-primary-dim: rgba(0, 200, 212, 0.12);
+    --accent-ai: #6457f9;
+    --accent-ai-text: #8b82ff;
+    --state-error: #ff4d4f;
+    --state-success: #34d399;
+    --state-warning: #fbbf24;
+
+    /*
+     * shadcn/ui adapter layer: components/ui/* is generated and not
+     * hand-edited (see context/ai-workflow-rules.md#protected-foundation-components),
+     * so its bg-primary/text-foreground/etc. classes keep working by
+     * pointing these at the raw palette above instead of renaming
+     * every generated file.
+     */
+    --background: var(--bg-base);
+    --foreground: var(--text-primary);
+    --card: var(--bg-surface);
+    --card-foreground: var(--text-primary);
+    --popover: var(--bg-elevated);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent-primary);
+    --primary-foreground: var(--bg-base);
+    --secondary: var(--bg-elevated);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--bg-subtle);
+    --muted-foreground: var(--text-muted);
+    --accent: var(--bg-subtle);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--state-error);
+    --border: var(--border-default);
+    --input: var(--bg-subtle);
+    --ring: var(--accent-primary);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: var(--bg-surface);
+    --sidebar-foreground: var(--text-primary);
+    --sidebar-primary: var(--accent-primary);
+    --sidebar-primary-foreground: var(--bg-base);
+    --sidebar-accent: var(--bg-subtle);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--border-default);
+    --sidebar-ring: var(--accent-primary);
 }
 
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+@layer components {
+  /*
+   * Clerk sets border/shadow/background to "none"/"transparent" via inline
+   * styles on this element when the widget renders inline (not as a modal),
+   * so !important is required to win the cascade against those inline styles.
+   */
+  .auth-card-glow {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-subtle) !important;
+    box-shadow:
+      0 0 0 1px var(--border-subtle),
+      0 0 40px 4px var(--accent-primary-dim),
+      0 0 90px 20px var(--accent-primary-dim) !important;
+  }
 }
 
 @layer base {
