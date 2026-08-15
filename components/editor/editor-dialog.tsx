@@ -25,7 +25,7 @@ export function EditorDialog({
 }: EditorDialogProps) {
   return (
     <Dialog {...props}>
-      <DialogContent>
+      <DialogContent className="rounded-3xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? (

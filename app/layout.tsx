@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -23,7 +25,33 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ClerkProvider
+          appearance={{
+            theme: dark,
+            variables: {
+              colorBackground: "var(--bg-base)",
+              colorForeground: "var(--text-primary)",
+              colorPrimary: "var(--accent-primary)",
+              colorPrimaryForeground: "var(--bg-base)",
+              colorNeutral: "var(--text-primary)",
+              colorMuted: "var(--bg-subtle)",
+              colorMutedForeground: "var(--text-muted)",
+              colorInput: "var(--bg-subtle)",
+              colorInputForeground: "var(--text-primary)",
+              colorBorder: "var(--border-default)",
+              colorRing: "var(--accent-primary)",
+              colorDanger: "var(--state-error)",
+              borderRadius: "var(--radius)",
+            },
+            elements: {
+              card: "auth-card-glow rounded-3xl",
+            },
+          }}
+        >
+          {children}
+        </ClerkProvider>
+      </body>
     </html>
   );
 }
