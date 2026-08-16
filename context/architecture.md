@@ -25,7 +25,7 @@
 
 - **Database**: metadata, ownership, relationships, and task run records.
 - **Vercel Blob**: generated artifacts — canvas snapshots at `canvas/{projectId}.json` (single mutable artifact, written only by Liveblocks snapshot export on room persistence or explicit export request) and specs at `specs/{projectId}/{specId}.md` (immutable, one per spec generation).
-- **Canvas snapshot management**: The canonical snapshot `canvas/{projectId}.json` is updated only by authenticated room-export operations and includes a revision identifier (or version field) for concurrent save conflict detection. Concurrent saves and retries check the stored snapshot's revision before committing; if the stored revision is newer, the write is rejected to prevent overwriting newer canvas state. On restore, the stored snapshot's revision is always authoritative — it is loaded directly into the Liveblocks room at initialization.
+- **Canvas snapshot management**: The canonical snapshot `canvas/{projectId}.json` is updated only by authenticated room-export operations using a single atomic compare-and-swap operation. Each project maintains a monotonic revision token (stored in the database alongside the blob reference). On write, the operation reads the current snapshot and revision, validates that the caller's expected revision matches the stored revision, and commits the new snapshot with an incremented revision only if the comparison succeeds; otherwise the save is rejected. On restore, the stored snapshot's revision is always authoritative — it is loaded directly into the Liveblocks room at initialization.
 - Project records, spec records, and task run records belong in PostgreSQL.
 - Canvas content and Markdown output are stored in and retrieved from Vercel Blob.
 - The blob URL is stored in the database (`canvasJsonPath`, `filePath`) as the reference to the artifact.
@@ -38,7 +38,8 @@
 - Only authenticated users can access protected routes.
 - **Owner-only mutations** (require ownership verification): project settings, project deletion, and collaborator membership management (adding/removing collaborators).
 - **Collaborator-permitted mutations** (require membership verification): canvas edits (node/edge operations), design generation requests, and spec generation requests. Collaborator edits to the canvas are applied through the shared Liveblocks room and do not require direct ownership checks.
-- Liveblocks room tokens are issued only after verifying the requesting user is an authenticated member (owner or collaborator) of the target project.
+- **Collaborator membership and authorization**: ProjectCollaborator records map normalized, verified email addresses to immutable Clerk user IDs. When a user's Clerk email changes, the server revalidates the mapping by updating the ProjectCollaborator record to point to the user's current email; membership checks always use the authenticated Clerk user ID (never client-supplied email). When a collaborator is removed from a project, all associated Liveblocks room tokens and session authorizations for that user are immediately revoked; subsequent room-token requests from the removed user are rejected.
+- Liveblocks room tokens are issued only after verifying the requesting user (authenticated via Clerk) is an active member (owner or collaborator) of the target project. The membership check uses the user's authenticated Clerk user ID to confirm the user has not been removed from the ProjectCollaborator list.
 
 ## Starter System Designs
 
@@ -58,9 +59,9 @@
 
 ### Spec Generation
 
-- Input: current canvas graph, project context, and current canvas revision identifier.
-- Execution: durable background task via Trigger.dev.
-- Output: Markdown technical spec saved to Vercel Blob at `specs/{projectId}/{specId}.md` with canvas revision metadata persisted in the database alongside the spec record. Stale-result policy: reject specs whose source canvas revision is no longer current, or explicitly expose them as historical artifacts in the UI while retaining their revision metadata for transparency.
+- Input: current canvas graph, project context, and current canvas revision identifier; captured atomically as one snapshot at task start.
+- Execution: durable background task via Trigger.dev. Before publishing the generated spec to Vercel Blob or creating the database spec record, revalidate that the captured source canvas revision is still current. Reject the spec generation if the revision is stale (no alternative exposure as historical artifacts).
+- Output: Markdown technical spec saved to Vercel Blob at `specs/{projectId}/{specId}.md` with canvas revision metadata persisted in the database alongside the spec record, only if the revalidation succeeds.
 
 ## Invariants
 
