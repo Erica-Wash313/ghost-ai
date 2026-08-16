@@ -72,14 +72,21 @@ change.
   - Follow-up per user request: applied the same `text-copy-primary` fix to the Create dialog's `Input` (same unreadable-typed-text issue, now reported there too).
   - Follow-up per user request: Delete dialog title now reads "Delete Project" (was "Delete project", matched casing to the other two dialogs) at the same `text-xl`/`text-copy-primary` treatment as Create/Rename. All three dialog titles are now visually consistent.
 
+- Implemented `05-prisma.md` end to end:
+  - `prisma/models/project.prisma` (new) — `Project` (`ownerId`, `name`, optional `description`, `status` enum `ProjectStatus` (`DRAFT` default / `ARCHIVED`), `canvasJsonPath`, timestamps, indexes on `ownerId` and `createdAt`) and `ProjectCollaborator` (`project` relation with `onDelete: Cascade`, `email`, `createdAt`, unique on `[projectId, email]`, indexes on `email` and `[projectId, createdAt]`). `cuid()` IDs on both, matching Prisma's standard default (spec didn't specify an ID scheme).
+  - Discovered (empirically, by testing since this Prisma version — 7.9.1 — ships no bundled docs to consult) that Prisma 7's multi-file schema support auto-discovers `.prisma` files recursively under whatever directory `schema` points to in `prisma.config.ts`, including subdirectories like `prisma/models/`. Repointed `prisma.config.ts`'s `schema` from the single file `"prisma/schema.prisma"` to the directory `"prisma"` so the pre-existing `prisma/schema.prisma` (generator/datasource only) and the new `prisma/models/project.prisma` load together — confirmed via `prisma validate`.
+  - `lib/prisma.ts` (new) — cached singleton on `globalThis` (dev-only, per the standard Next.js hot-reload pattern). Branches on `DATABASE_URL`: `prisma+postgres://` prefix → native `accelerateUrl` constructor option (confirmed by reading the generated client's own type definitions that Prisma 7's `prisma-client` generator supports `accelerateUrl` directly — no `@prisma/extension-accelerate` package needed, and none was in the spec's dependency list); otherwise → `@prisma/adapter-pg`'s `PrismaPg` adapter, per spec.
+  - Ran `prisma dev --detach` to start the local Prisma Postgres dev server the existing `.env`'s `prisma+postgres://localhost:...` URL points at (it wasn't running), then `prisma migrate dev --name add_project_models` — applied cleanly, `prisma/migrations/20260816131237_add_project_models/migration.sql` created.
+  - Verified: `prisma validate`, `tsc --noEmit`, `npm run lint`, and `npm run build` all clean/pass.
+
 ## In Progress
 
 - None.
 
 ## Next Up
 
-- Connect signed-in user identity (now available via `auth()`/`UserButton`) to project ownership/storage once that data model is specced.
-- Replace `04-project-dialogs.md`'s mock project data and in-memory create/rename/delete with real persistence once the Prisma schema and `app/api/` routes for projects exist.
+- Connect signed-in user identity (now available via `auth()`/`UserButton`) to project ownership/storage now that the `Project`/`ProjectCollaborator` models exist.
+- Replace `04-project-dialogs.md`'s mock project data and in-memory create/rename/delete with real persistence via `app/api/` routes backed by the new Prisma models.
 
 ## Open Questions
 
@@ -94,7 +101,7 @@ change.
   - **Radius scale isn't fully migrated.** `ui-context.md` calls for `rounded-xl` (inline/small UI), `rounded-2xl` (cards/panels), `rounded-3xl` (modals). `components/ui/card.tsx` and `components/ui/button.tsx` are shadcn-generated and still use the old proportional `--radius-*` scale (`rounded-xl`/`rounded-lg` sized off a single `--radius` base, unrelated to the new 3-tier role-based scale) — changing those class names directly would mean hand-editing protected files and would silently be wiped out by the next `npx shadcn add --overwrite`. Only fixed the one case that's app-owned, not generated: `components/editor/editor-dialog.tsx`'s `DialogContent` now gets `rounded-3xl` via its own `className` override. `Card` isn't used anywhere yet, so its `rounded-xl` (should be `rounded-2xl` per spec) has no visible impact today — whoever first uses `Card` for an actual card/panel should pass `className="rounded-2xl"` at the call site rather than editing `card.tsx`. Worth a real decision later: keep shadcn's proportional radius system as the exception, or invest in overriding it repo-wide.
   - **Sidebar isn't semi-transparent.** `ui-context.md`'s Layout Patterns says "Sidebars: floating overlay with dark semi-transparent background and subtle border" — `project-sidebar.tsx` kept its existing solid `bg-surface` rather than adding transparency/backdrop-blur, since that's a structural/visual change beyond a token rename. Flagging so it's not mistaken for done.
   - Also not addressed: `ui-context.md`'s Canvas section (node color palette, edge style, node shapes) — there's no canvas yet to apply it to; belongs with whatever spec first builds the canvas, not this token pass.
-- **None of the new stack is installed.** `architecture.md` now specifies Prisma + PostgreSQL, Liveblocks + React Flow, Trigger.dev, and Vercel Blob — `package.json` has none of them (only `@clerk/nextjs`, `@clerk/ui`, `@base-ui/react`, `shadcn`-generated deps, `lucide-react`, `next`/`react`). Also referenced-but-missing: `app/api/`, `trigger/`, `prisma/`, `data/`, `types/canvas.ts`. None of this blocks current work, but the first canvas-related spec will need to land these as its own unit(s) per the scoping rules in `ai-workflow-rules.md` ("Real-time canvas state and database persistence" is explicitly called out there as a reason to split work).
+- **Most of the new stack is still not installed.** `architecture.md` specifies Prisma + PostgreSQL (now landed, see Completed), Liveblocks + React Flow, Trigger.dev, and Vercel Blob — `package.json` still has none of the latter three. Also referenced-but-missing: `app/api/`, `trigger/`, `data/`, `types/canvas.ts`. None of this blocks current work, but the first canvas-related spec will need to land these as its own unit(s) per the scoping rules in `ai-workflow-rules.md` ("Real-time canvas state and database persistence" is explicitly called out there as a reason to split work).
 
 ## Architecture Decisions
 
