@@ -7,7 +7,9 @@ import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { EditorWorkspace } from "@/components/editor/editor-workspace"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
+import { ShareDialog } from "@/components/editor/share-dialog"
 import { useProjectActions } from "@/hooks/use-project-actions"
+import { cn } from "@/lib/utils"
 import type { Project } from "@/types/project"
 
 interface EditorShellProps {
@@ -22,6 +24,8 @@ export function EditorShell({
   activeProject = null,
 }: EditorShellProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false)
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
   const {
     dialog,
     name,
@@ -43,18 +47,30 @@ export function EditorShell({
       <EditorNavbar
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
+        projectName={activeProject?.name}
+        onShare={activeProject ? () => setIsShareDialogOpen(true) : undefined}
+        isAiSidebarOpen={isAiSidebarOpen}
+        onToggleAiSidebar={
+          activeProject ? () => setIsAiSidebarOpen((open) => !open) : undefined
+        }
       />
       <ProjectSidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         projects={[...ownedProjects, ...sharedProjects]}
+        activeProjectId={activeProject?.id}
         onCreateProject={openCreate}
         onRenameProject={openRename}
         onDeleteProject={openDelete}
       />
-      <main className="flex flex-1">
+      <main
+        className={cn(
+          "flex flex-1 overflow-hidden transition-[margin-left] duration-200 ease-in-out",
+          isSidebarOpen && "md:ml-72"
+        )}
+      >
         {activeProject ? (
-          <EditorWorkspace project={activeProject} />
+          <EditorWorkspace project={activeProject} isAiSidebarOpen={isAiSidebarOpen} />
         ) : (
           <EditorHome onCreateProject={openCreate} />
         )}
@@ -71,6 +87,14 @@ export function EditorShell({
         submitRename={submitRename}
         submitDelete={submitDelete}
       />
+      {activeProject ? (
+        <ShareDialog
+          key={activeProject.id}
+          open={isShareDialogOpen}
+          onOpenChange={setIsShareDialogOpen}
+          project={activeProject}
+        />
+      ) : null}
     </div>
   )
 }

@@ -58,23 +58,37 @@ export function useProjectActions(activeProjectId?: string) {
     setIsLoading(true)
     setError(null)
 
-    const response = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: trimmedName, id: roomId }),
-    })
+    try {
+      const createProject = (id: string) =>
+        fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmedName, id }),
+        })
 
-    if (!response.ok) {
+      let response = await createProject(roomId)
+
+      if (response.status === 409) {
+        const nextSuffix = generateShortSuffix()
+        const nextRoomId = `${slugify(trimmedName) || "project"}-${nextSuffix}`
+        setSuffix(nextSuffix)
+        response = await createProject(nextRoomId)
+      }
+
+      if (!response.ok) {
+        setError("Couldn't create the project. Try again.")
+        return
+      }
+
+      const { project } = (await response.json()) as { project: { id: string } }
+      setDialog(null)
+      setName("")
+      router.push(`/editor/${project.id}`)
+    } catch {
       setError("Couldn't create the project. Try again.")
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    const { project } = (await response.json()) as { project: { id: string } }
-    setDialog(null)
-    setName("")
-    setIsLoading(false)
-    router.push(`/editor/${project.id}`)
   }
 
   async function submitRename() {
@@ -85,22 +99,26 @@ export function useProjectActions(activeProjectId?: string) {
     setIsLoading(true)
     setError(null)
 
-    const response = await fetch(`/api/projects/${dialog.project.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: trimmedName }),
-    })
+    try {
+      const response = await fetch(`/api/projects/${dialog.project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedName }),
+      })
 
-    setIsLoading(false)
+      if (!response.ok) {
+        setError("Couldn't rename the project. Try again.")
+        return
+      }
 
-    if (!response.ok) {
+      setDialog(null)
+      setName("")
+      router.refresh()
+    } catch {
       setError("Couldn't rename the project. Try again.")
-      return
+    } finally {
+      setIsLoading(false)
     }
-
-    setDialog(null)
-    setName("")
-    router.refresh()
   }
 
   async function submitDelete() {
@@ -109,24 +127,28 @@ export function useProjectActions(activeProjectId?: string) {
     setIsLoading(true)
     setError(null)
 
-    const response = await fetch(`/api/projects/${dialog.project.id}`, {
-      method: "DELETE",
-    })
+    try {
+      const response = await fetch(`/api/projects/${dialog.project.id}`, {
+        method: "DELETE",
+      })
 
-    setIsLoading(false)
+      if (!response.ok) {
+        setError("Couldn't delete the project. Try again.")
+        return
+      }
 
-    if (!response.ok) {
+      const wasActive = dialog.project.id === activeProjectId
+      setDialog(null)
+
+      if (wasActive) {
+        router.push("/editor")
+      } else {
+        router.refresh()
+      }
+    } catch {
       setError("Couldn't delete the project. Try again.")
-      return
-    }
-
-    const wasActive = dialog.project.id === activeProjectId
-    setDialog(null)
-
-    if (wasActive) {
-      router.push("/editor")
-    } else {
-      router.refresh()
+    } finally {
+      setIsLoading(false)
     }
   }
 

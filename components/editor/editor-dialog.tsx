@@ -8,12 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
 interface EditorDialogProps extends ComponentProps<typeof Dialog> {
   title: ReactNode
   description?: ReactNode
   footer?: ReactNode
   children?: ReactNode
+  contentClassName?: string
 }
 
 export function EditorDialog({
@@ -21,11 +23,12 @@ export function EditorDialog({
   description,
   footer,
   children,
+  contentClassName,
   ...props
 }: EditorDialogProps) {
   return (
     <Dialog {...props}>
-      <DialogContent className="rounded-3xl">
+      <DialogContent className={cn("rounded-3xl", contentClassName)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? (
