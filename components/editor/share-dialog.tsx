@@ -63,6 +63,11 @@ export function ShareDialog({ open, onOpenChange, project }: ShareDialogProps) {
   useEffect(() => {
     if (!open) return
 
+    // This effect intentionally resets request UI state when the dialog opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoading(true)
+    setError(null)
+
     const controller = new AbortController()
     void fetch(`/api/projects/${project.id}/collaborators`, {
       signal: controller.signal,

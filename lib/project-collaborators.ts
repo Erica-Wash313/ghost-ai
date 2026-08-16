@@ -9,7 +9,10 @@ interface ClerkUserProfile {
   readonly fullName: string | null
   readonly username: string | null
   readonly imageUrl: string
-  readonly primaryEmailAddress: { readonly emailAddress: string } | null
+  readonly primaryEmailAddress: {
+    readonly emailAddress: string
+    readonly verification: { readonly status: string } | null
+  } | null
   readonly emailAddresses: ReadonlyArray<{ readonly emailAddress: string }>
 }
 
@@ -34,9 +37,10 @@ function getUserByEmail(
   const usersByEmail = new Map<string, ClerkUserProfile>()
 
   for (const user of users) {
-    for (const emailAddress of user.emailAddresses) {
-      usersByEmail.set(emailAddress.emailAddress.toLowerCase(), user)
-    }
+    const primaryEmail = user.primaryEmailAddress
+    if (primaryEmail?.verification?.status !== "verified") continue
+
+    usersByEmail.set(primaryEmail.emailAddress.toLowerCase(), user)
   }
 
   return usersByEmail

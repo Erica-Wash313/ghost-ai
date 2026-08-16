@@ -59,14 +59,23 @@ export function useProjectActions(activeProjectId?: string) {
     setError(null)
 
     try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmedName, id: roomId }),
-      })
+      const createProject = (id: string) =>
+        fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmedName, id }),
+        })
+
+      let response = await createProject(roomId)
+
+      if (response.status === 409) {
+        const nextSuffix = generateShortSuffix()
+        const nextRoomId = `${slugify(trimmedName) || "project"}-${nextSuffix}`
+        setSuffix(nextSuffix)
+        response = await createProject(nextRoomId)
+      }
 
       if (!response.ok) {
-        if (response.status === 409) setSuffix(generateShortSuffix())
         setError("Couldn't create the project. Try again.")
         return
       }

@@ -21,7 +21,7 @@ Create `components/editor/access-denied.tsx` with:
 
 Create `lib/project-access.ts` with helpers for:
 
-- getting current Clerk identity: `userId` + primary email
+- getting current Clerk identity: `userId` + normalized, Clerk-verified primary email; secondary and unverified emails are not eligible for collaborator access or identity enrichment
 - checking project access by owner or collaborator
 
 ## Layout
