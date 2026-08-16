@@ -2,7 +2,7 @@ We need the base chrome components that frame every editor screen - the top navb
 
 ### Editor Navbar
 
-Create `componets/editor/editor-navbar.tsx`.
+Create `components/editor/editor-navbar.tsx`.
 
 Requirements:
 
@@ -15,6 +15,9 @@ Requirements:
 
 ### Project Sidebar
 
+> Phase-one scaffold. Superseded by `context/feature-specs/04-project-dialogs.md`,
+> which defines the current project list and dialog behavior.
+
 Create `components/editor/project-sidebar.tsx`.
 
 Requirements:
@@ -22,15 +25,18 @@ Requirements:
 - sidebar should float above the editor canvas
 - opening it should not push page content
 - slides in from the left
-- accepts `isOpen ` prop
+- accepts `isOpen` prop
 - header with `Projects` title + close button
 - shadcn `Tabs`:
- - My Projects
- - Shared
+  - My Projects
+  - Shared
 - both tabs show empty placeholder state
 - full-width `New Project` button at the bottom with `Plus` icon
 
 ### Dialog Pattern
+
+> Phase-one scaffold. Superseded by `context/feature-specs/04-project-dialogs.md`,
+> which defines the current project list and dialog behavior.
 
 Use the existing color tokens from `global.css` for dialog styling.
 

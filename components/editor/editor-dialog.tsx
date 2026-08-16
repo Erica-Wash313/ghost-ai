@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog"
 
 interface EditorDialogProps extends ComponentProps<typeof Dialog> {
-  title: string
-  description?: string
+  title: ReactNode
+  description?: ReactNode
   footer?: ReactNode
   children?: ReactNode
 }

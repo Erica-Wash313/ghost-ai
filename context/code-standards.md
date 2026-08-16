@@ -26,6 +26,7 @@
 - Use CSS custom property tokens defined in `globals.css` — no raw Tailwind color classes like `zinc-*` or hardcoded hex values.
 - Reference tokens through their Tailwind utility names: `bg-base`, `text-copy-primary`, `border-surface-border`, `text-brand`, etc.
 - Maintain the border radius scale: `rounded-xl` for small elements, `rounded-2xl` for cards, `rounded-3xl` for modals.
+- Canvas and specialized components must also reference CSS custom properties (e.g., `--node-*`, `--edge-*` variables from `globals.css`) instead of literal color values — no exceptions for non-UI code.
 
 ## API Routes
 

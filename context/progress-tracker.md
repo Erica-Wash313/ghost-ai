@@ -5,11 +5,11 @@ change.
 
 ## Current Phase
 
-- In progress
+- In progress: Design-token migration (remaining work: radius scale)
 
 ## Current Goal
 
-- Design-token migration: bring `app/globals.css` and every app-owned component in line with `ui-context.md`'s real color palette (`--bg-base`, `--accent-primary` cyan, `--accent-ai` indigo, etc.), which is what the previous session's Open Questions flagged as not matching. Done for colors; radius scale partially deferred (see Open Questions).
+- Complete design-token migration: bring `app/globals.css` and every app-owned component in line with `ui-context.md`'s real color palette (`--bg-base`, `--accent-primary` cyan, `--accent-ai` indigo, etc.). Color tokens are complete; radius-scale tokens are deferred (see Open Questions for details and criteria).
 
 ## Completed
 
@@ -36,7 +36,7 @@ change.
   - `.env.local` already had all required Clerk env vars (publishable key, secret key, sign-in/up URLs, fallback redirect URLs) and `@clerk/ui` was already in `package.json` — no new install needed.
 - Verified with a real headless-browser pass (Playwright via `npx`, driving the already-running `next dev` on :3000): `/` → redirects to `/sign-in` when signed out; `/sign-in` and `/sign-up` render the two-panel layout at 1440×900 and collapse to form-only at 390×844; dark theme reads correctly from the CSS variables (matches app surface/border colors, not stock Clerk `shadcn` colors); zero console errors on any of the four screenshots.
 - Verified: `npm run build` succeeds (`/` and the two catch-all auth routes are dynamic as expected since they call `auth()`/render `<SignIn>`/`<SignUp>`; `/editor` still static), `npm run lint` clean.
-- Filled in the four still-templated context files from direct codebase inspection (not invented):
+- Filled in the five still-templated context files from direct codebase inspection (not invented):
   - `architecture.md` — real stack table, system boundaries (`app/`, `proxy.ts`, `components/{ui,editor,auth}/`, `lib/`), storage model (none yet), auth/access model (Clerk + protected-first `proxy.ts` + `/`'s explicit redirect), and four invariants.
   - `ui-context.md` — full dark-theme color table pulled straight from `app/globals.css`'s `.dark` block, typography (Geist Sans/Mono), the `--radius-*` scale and its formula, component library conventions, the three layout patterns actually built (editor, auth, modal), and icon sizing observed in the code.
   - `code-standards.md` — concretized every bracketed rule against what's actually true (strict TS, `@/*` alias, Server-Components-by-default, `proxy.ts`-only auth, CSS-variable-only styling, `components/ui/*` regenerate-don't-edit), left API Routes / Data & Storage explicitly unfilled since neither exists yet.
@@ -55,20 +55,35 @@ change.
   - Migrated every app-owned (non-`components/ui/*`) file's explicit color classes to the new names, since `code-standards.md` requires the new utility names going forward: `app/layout.tsx` (Clerk `appearance.variables`, now pointing at `--bg-base`/`--accent-primary`/etc. directly instead of the shadcn-adapter var names), `components/auth/auth-layout.tsx`, `components/editor/editor-navbar.tsx`, `components/editor/project-sidebar.tsx`, `app/editor/page.tsx`.
   - Applied the modal radius from `ui-context.md#layout-patterns` (`rounded-3xl`) to `components/editor/editor-dialog.tsx`'s `DialogContent` via its own `className` override — that file is app-owned, not shadcn-generated, so no protected-file conflict.
   - Verified: `npm run build` and `npm run lint` clean; re-ran the Playwright screenshot pass against `/sign-in` and `/sign-up` — cyan `--accent-primary` now visibly renders on the primary button and links, near-black `--bg-base` background reads correctly, zero console errors.
+- Implemented `04-project-dialogs.md` end to end:
+  - `types/project.ts` (new) — `Project` interface (`id`, `name`, `slug`, `isOwner`).
+  - `lib/mock-projects.ts` (new) — static `MOCK_PROJECTS` array (2 owned, 1 shared) used as the hook's initial state.
+  - `lib/utils.ts` — added `slugify()` for the live slug preview.
+  - Added the `dropdown-menu` shadcn component (`npx shadcn add dropdown-menu`, `components/ui/dropdown-menu.tsx`) for sidebar item actions — not hand-written, per the protected-foundation-components rule.
+  - `hooks/use-project-dialogs.ts` (new) — the dedicated hook the spec calls for: owns dialog state (`{type: "create"|"rename"|"delete", project?}` | `null`), form state (`name`, derived `slug`), loading state, and in-memory create/rename/delete against the mock `projects` array (simulated `setTimeout` delay, no API calls, per spec's "no API calls or persistence").
+  - `components/editor/project-dialogs.tsx` (new) — the three dialogs (Create/Rename/Delete) built on the existing `EditorDialog` pattern, driven entirely by the hook's return value. Create has the name input + live slug preview; Rename is prefilled, auto-focuses, and submits on Enter; Delete is confirmation-only with a `destructive`-variant confirm button, no input.
+  - `components/editor/editor-home.tsx` (new) — the centered, card-free empty state (heading, description, `New Project` button with `Plus` icon) that now fills `app/editor/page.tsx`'s `<main>`, replacing the old "Canvas" placeholder text.
+  - `components/editor/project-sidebar.tsx` — added a mobile backdrop scrim (`md:hidden`, click-to-close, opacity-transitioned) and project list items per tab (owned vs. shared, split from the single mock array by `isOwner`). Owned items get a `DropdownMenu` (kebab trigger) with Rename/Delete; shared items render no actions menu at all, per spec ("hide actions for shared/collaborator projects" — not just disabled, actually absent).
+  - `app/editor/page.tsx` — now the composition root: owns `useProjectDialogs()`, wires the navbar/sidebar toggle, passes `projects`/`onCreateProject`/`onRenameProject`/`onDeleteProject` into `ProjectSidebar`, renders `EditorHome` in `<main>`, and renders `ProjectDialogs` at the bottom. Navbar and existing sidebar toggle behavior untouched, per spec.
+  - Verified end to end with a real headless-browser pass (Playwright via `npx`): built a temporary unauthenticated mirror route to get past Clerk's proxy protection (added `/dev-preview` to `proxy.ts`'s public-route list, added `app/dev-preview/page.tsx` rendering the same composition as `/editor`), drove all 21 spec-derived checks (slug preview live-updates, owned-vs-shared action visibility, rename prefill/autofocus/Enter-submit, delete's destructive-only confirmation, mobile backdrop scrim + click-outside-closes) — all passed, zero console errors — then deleted the temp route and reverted `proxy.ts` back to its original two-entry public-route list (confirmed via `git diff proxy.ts` showing no changes).
+  - Verified: `tsc --noEmit` clean, `npm run lint` clean, `npm run build` succeeds (`/editor` still static).
+  - Follow-up per user request: Create dialog now reads "New Project" (was "Create project") at `text-xl`/`text-copy-primary` (was the shared `DialogTitle` default `text-base`, no explicit color) and "Give your project a name to get started." (was "Start a new architecture workspace."). Changed `EditorDialog`'s `title`/`description` prop types from `string` to `ReactNode` so this one dialog could override size/color via a wrapping `<span>` without touching the shared, protected `components/ui/dialog.tsx` `DialogTitle` styles that every other dialog still uses unchanged. Verified `tsc --noEmit`/`npm run lint` clean.
+  - Follow-up per user request: Rename dialog title now reads "Rename Project" at the same `text-xl`/`text-copy-primary` treatment as the Create dialog. Also added `text-copy-primary` directly to the Rename dialog's `Input` — the user reported typed text was unreadable in that field; `components/ui/input.tsx` has no explicit text color (relies on inherited `color`), and something in the inherited chain was resolving to a color that didn't contrast against the dark `bg-input` fill, so this pins it explicitly rather than depending on inheritance. Only applied to this Input instance, not `input.tsx` itself (protected foundation component). Verified `tsc --noEmit`/`npm run lint` clean.
+  - Follow-up per user request: applied the same `text-copy-primary` fix to the Create dialog's `Input` (same unreadable-typed-text issue, now reported there too).
+  - Follow-up per user request: Delete dialog title now reads "Delete Project" (was "Delete project", matched casing to the other two dialogs) at the same `text-xl`/`text-copy-primary` treatment as Create/Rename. All three dialog titles are now visually consistent.
 
 ## In Progress
 
-- None — auth step, both context-doc passes, and the color half of the token migration are complete pending review. Radius is intentionally partial — see Open Questions.
+- None.
 
 ## Next Up
 
-- Wire the sidebar toggle button + "New Project" button into real state/actions once project data and creation flow are defined.
-- Wire an actual dialog (e.g. "New Project") using the `EditorDialog` pattern once that flow is specced.
 - Connect signed-in user identity (now available via `auth()`/`UserButton`) to project ownership/storage once that data model is specced.
-- No feature spec exists yet for any of `project-overview.md`'s actual product (canvas, AI generation, spec generation, projects/collaborators). Specs 01–03 only cover design system, editor chrome, and auth. Per `ai-workflow-rules.md`'s own rule ("do not infer or invent behavior from scratch"), nothing in that vision should be built until a numbered spec (04+) defines it — this tracker entry exists so that's not silently skipped.
+- Replace `04-project-dialogs.md`'s mock project data and in-memory create/rename/delete with real persistence once the Prisma schema and `app/api/` routes for projects exist.
 
 ## Open Questions
 
+- `04-project-dialogs.md` didn't define a "project open" state or route (e.g. `/editor/[projectId]`) — only the empty-state home and the dialogs/sidebar. `EditorHome` now unconditionally fills `<main>` (replacing the old "Canvas" placeholder text), since there's nothing in this spec that distinguishes "no project selected" from "viewing a project." Whichever spec introduces the canvas will need to define that routing/state so `EditorHome` only shows when no project is open.
 - Spec 01-design-system.md said to match an "existing dark theme" in `global.css`, but no theme existed there (it only had `@import "tailwindcss";`). Resolved by defaulting the app to dark via a `dark` class on `<html>` rather than relying on `prefers-color-scheme`. Flag if a light/dark toggle is wanted later — this will need to move off a static class.
 - 01-editor.md's spec text has a typo pointing the navbar at `componets/editor/editor-navbar.tsx` (missing "n"); implemented at the correctly spelled `components/editor/editor-navbar.tsx` to match the sidebar's path and the rest of the codebase's convention. Flag if that was actually intentional.
 - Spec didn't say where/how these two chrome components should be composed into an actual screen. Added `app/editor/page.tsx` as the minimal host needed to verify the toggle behavior end to end — revisit/rename once the real editor route and layout are specced.
