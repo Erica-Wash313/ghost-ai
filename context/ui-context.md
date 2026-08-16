@@ -51,24 +51,24 @@ Radius increases with surface depth — smaller for inner elements, larger for o
 
 ### Node Color Palette
 
-8 defined color pairs. Each pair specifies a dark node fill and a vivid contrasting text color tuned for readability on the dark canvas. Defined in `types/canvas.ts` as `NODE_COLORS`.
+8 defined color pairs. Each pair specifies a dark node fill and a vivid contrasting text color tuned for readability on the dark canvas. All colors are defined as CSS custom properties in `globals.css` (see `--node-*` variables) and must be referenced through the `NODE_COLORS` type in `types/canvas.ts`.
 
-| Node fill | Text color | Character              |
-| --------- | ---------- | ------------------------ |
-| `#1F1F1F` | `#EDEDED`  | Neutral dark (default)  |
-| `#10233D` | `#52A8FF`  | Blue                     |
-| `#2E1938` | `#BF7AF0`  | Purple                   |
-| `#331B00` | `#FF990A`  | Orange                   |
-| `#3C1618` | `#FF6166`  | Red                      |
-| `#3A1726` | `#F75F8F`  | Pink                     |
-| `#0F2E18` | `#62C073`  | Green                    |
-| `#062822` | `#0AC7B4`  | Teal                     |
+| Node fill             | Text color            | Character              |
+| --------------------- | --------------------- | ---------------------- |
+| `--node-default-fill` | `--node-default-text` | Neutral dark (default) |
+| `--node-blue-fill`    | `--node-blue-text`    | Blue                   |
+| `--node-purple-fill`  | `--node-purple-text`  | Purple                 |
+| `--node-orange-fill`  | `--node-orange-text`  | Orange                 |
+| `--node-red-fill`     | `--node-red-text`     | Red                    |
+| `--node-pink-fill`    | `--node-pink-text`    | Pink                   |
+| `--node-green-fill`   | `--node-green-text`   | Green                  |
+| `--node-teal-fill`    | `--node-teal-text`    | Teal                   |
 
-Default node color: `#1F1F1F` with `#EDEDED` text.
+Default node color: `--node-default-fill` with `--node-default-text` text.
 
 ### Edge Style
 
-Smooth-step path with an arrow marker. Default edge color: `#f8fafc`. Stroke width is thin — edges are visually secondary to nodes.
+Smooth-step path with an arrow marker. Default edge color: `--edge-default-color` (defined as a CSS custom property in `globals.css`). Stroke width is thin — edges are visually secondary to nodes.
 
 ### Node Shapes
 
@@ -91,7 +91,7 @@ React Flow `<Background>` component. Canvas sits on the base background color.
 
 ## Component Library
 
-shadcn/ui on top of Tailwind. No custom design system. Components live in `components/ui/`. Use the `shadcn` CLI to add new components rather than writing them from scratch.
+shadcn/ui on top of Tailwind — shadcn/ui provides the component foundation. This file defines the project's custom theme tokens (colors, typography, radius scale), layout patterns, and canvas styling. Components live in `components/ui/`. Use the `shadcn` CLI to add new components rather than writing them from scratch.
 
 ## Layout Patterns
 

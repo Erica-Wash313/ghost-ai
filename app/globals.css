@@ -92,6 +92,25 @@
     --state-success: #34d399;
     --state-warning: #fbbf24;
 
+    /* Canvas node colors (context/ui-context.md#canvas) */
+    --node-default-fill: #1F1F1F;
+    --node-default-text: #EDEDED;
+    --node-blue-fill: #10233D;
+    --node-blue-text: #52A8FF;
+    --node-purple-fill: #2E1938;
+    --node-purple-text: #BF7AF0;
+    --node-orange-fill: #331B00;
+    --node-orange-text: #FF990A;
+    --node-red-fill: #3C1618;
+    --node-red-text: #FF6166;
+    --node-pink-fill: #3A1726;
+    --node-pink-text: #F75F8F;
+    --node-green-fill: #0F2E18;
+    --node-green-text: #62C073;
+    --node-teal-fill: #062822;
+    --node-teal-text: #0AC7B4;
+    --edge-default-color: #f8fafc;
+
     /*
      * shadcn/ui adapter layer: components/ui/* is generated and not
      * hand-edited (see context/ai-workflow-rules.md#protected-foundation-components),

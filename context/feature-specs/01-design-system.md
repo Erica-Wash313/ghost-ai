@@ -20,11 +20,11 @@ Also Install `lucide-react`.
 
 Create `lib/utils.ts` with a reusable `cn()` helper for merging Tailwind classes.
 
-Ensure all components match the existing dark thems in `global.css`.
+Ensure all components match the existing dark themes in `app/globals.css`.
 
 
 ### Check when done
 
-- All components import without erros
+- All components import without errors
 - `cn()` works properly
 - No default light styling appears
