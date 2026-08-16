@@ -1,4 +1,5 @@
 import { MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +16,7 @@ interface ProjectSidebarProps {
   isOpen: boolean
   onClose: () => void
   projects: Project[]
+  activeProjectId?: string
   onCreateProject: () => void
   onRenameProject: (project: Project) => void
   onDeleteProject: (project: Project) => void
@@ -24,6 +26,7 @@ export function ProjectSidebar({
   isOpen,
   onClose,
   projects,
+  activeProjectId,
   onCreateProject,
   onRenameProject,
   onDeleteProject,
@@ -46,7 +49,7 @@ export function ProjectSidebar({
         aria-hidden={!isOpen}
         inert={!isOpen}
         className={cn(
-          "fixed top-12 left-0 z-40 flex h-[calc(100%-3rem)] w-72 flex-col border-r border-surface-border bg-surface text-copy-primary shadow-lg transition-transform duration-200 ease-in-out",
+          "fixed top-16 left-0 z-40 flex h-[calc(100%-4rem)] w-72 flex-col border-r border-surface-border bg-surface text-copy-primary shadow-lg transition-transform duration-200 ease-in-out",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -84,6 +87,7 @@ export function ProjectSidebar({
                   <ProjectItem
                     key={project.id}
                     project={project}
+                    isActive={project.id === activeProjectId}
                     onRename={onRenameProject}
                     onDelete={onDeleteProject}
                   />
@@ -102,6 +106,7 @@ export function ProjectSidebar({
                   <ProjectItem
                     key={project.id}
                     project={project}
+                    isActive={project.id === activeProjectId}
                     onRename={onRenameProject}
                     onDelete={onDeleteProject}
                   />
@@ -116,7 +121,7 @@ export function ProjectSidebar({
         </Tabs>
 
         <div className="border-t border-surface-border p-4">
-          <Button className="w-full" onClick={onCreateProject}>
+          <Button className="w-full rounded-full" onClick={onCreateProject}>
             <Plus className="size-4" />
             New Project
           </Button>
@@ -128,14 +133,28 @@ export function ProjectSidebar({
 
 interface ProjectItemProps {
   project: Project
+  isActive?: boolean
   onRename: (project: Project) => void
   onDelete: (project: Project) => void
 }
 
-function ProjectItem({ project, onRename, onDelete }: ProjectItemProps) {
+function ProjectItem({ project, isActive, onRename, onDelete }: ProjectItemProps) {
   return (
-    <li className="flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm hover:bg-elevated">
-      <span className="truncate">{project.name}</span>
+    <li
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm hover:bg-elevated",
+        isActive && "bg-accent-dim text-brand hover:bg-accent-dim"
+      )}
+    >
+      <Link
+        href={`/editor/${project.id}`}
+        className="flex min-w-0 flex-1 items-center gap-2"
+      >
+        {isActive && (
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-brand" />
+        )}
+        <span className="truncate">{project.name}</span>
+      </Link>
       {project.isOwner && (
         <DropdownMenu>
           <DropdownMenuTrigger

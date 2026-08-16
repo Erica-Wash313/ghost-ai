@@ -1,26 +1,25 @@
 import { auth } from "@clerk/nextjs/server"
-import { notFound, redirect } from "next/navigation"
+import { redirect } from "next/navigation"
 
+import { AccessDenied } from "@/components/editor/access-denied"
 import { EditorShell } from "@/components/editor/editor-shell"
 import { getProjectForUser, getProjectsForUser } from "@/lib/projects"
 
-interface EditorProjectPageProps {
-  params: Promise<{ projectId: string }>
+interface EditorRoomPageProps {
+  params: Promise<{ roomId: string }>
 }
 
-export default async function EditorProjectPage({
-  params,
-}: EditorProjectPageProps) {
+export default async function EditorRoomPage({ params }: EditorRoomPageProps) {
   const { userId } = await auth()
   if (!userId) redirect("/sign-in")
 
-  const { projectId } = await params
+  const { roomId } = await params
   const [{ owned, shared }, access] = await Promise.all([
     getProjectsForUser(userId),
-    getProjectForUser(userId, projectId),
+    getProjectForUser(userId, roomId),
   ])
 
-  if (access.status === "not_found") notFound()
+  if (access.status === "not_found") return <AccessDenied />
 
   return (
     <EditorShell

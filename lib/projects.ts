@@ -1,6 +1,5 @@
-import { currentUser } from "@clerk/nextjs/server"
-
 import { prisma } from "@/lib/prisma"
+import { checkProjectAccess, getCurrentIdentity } from "@/lib/project-access"
 import type { Project as PrismaProject } from "@/app/generated/prisma/client"
 import type { Project } from "@/types/project"
 
@@ -9,7 +8,7 @@ export interface ProjectLists {
   shared: Project[]
 }
 
-export type ProjectAccessResult =
+export type ProjectForUserResult =
   | { status: "ok"; project: Project }
   | { status: "not_found" }
 
@@ -17,17 +16,8 @@ function toProject(project: PrismaProject, isOwner: boolean): Project {
   return { id: project.id, name: project.name, isOwner }
 }
 
-async function getVerifiedEmail(): Promise<string | null> {
-  const user = await currentUser()
-  const primaryEmail = user?.primaryEmailAddress
-
-  if (primaryEmail?.verification?.status !== "verified") return null
-
-  return primaryEmail.emailAddress.toLowerCase()
-}
-
 export async function getProjectsForUser(userId: string): Promise<ProjectLists> {
-  const email = await getVerifiedEmail()
+  const { email } = await getCurrentIdentity(userId)
 
   const [owned, collaborations] = await Promise.all([
     prisma.project.findMany({
@@ -52,22 +42,11 @@ export async function getProjectsForUser(userId: string): Promise<ProjectLists> 
 export async function getProjectForUser(
   userId: string,
   projectId: string,
-): Promise<ProjectAccessResult> {
-  const project = await prisma.project.findUnique({ where: { id: projectId } })
-  if (!project) return { status: "not_found" }
+): Promise<ProjectForUserResult> {
+  const identity = await getCurrentIdentity(userId)
+  const access = await checkProjectAccess(projectId, identity)
 
-  if (project.ownerId === userId) {
-    return { status: "ok", project: toProject(project, true) }
-  }
+  if (access.status === "not_found") return { status: "not_found" }
 
-  const email = await getVerifiedEmail()
-  const collaborator = email
-    ? await prisma.projectCollaborator.findUnique({
-        where: { projectId_email: { projectId, email } },
-      })
-    : null
-
-  if (!collaborator) return { status: "not_found" }
-
-  return { status: "ok", project: toProject(project, false) }
+  return { status: "ok", project: toProject(access.project, access.isOwner) }
 }
