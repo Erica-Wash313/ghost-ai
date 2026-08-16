@@ -3,15 +3,16 @@ import { Loader2 } from "lucide-react"
 import { EditorDialog } from "@/components/editor/editor-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { UseProjectDialogsReturn } from "@/hooks/use-project-dialogs"
+import type { UseProjectActionsReturn } from "@/hooks/use-project-actions"
 
 type ProjectDialogsProps = Pick<
-  UseProjectDialogsReturn,
+  UseProjectActionsReturn,
   | "dialog"
   | "name"
   | "setName"
-  | "slug"
+  | "roomId"
   | "isLoading"
+  | "error"
   | "close"
   | "submitCreate"
   | "submitRename"
@@ -22,8 +23,9 @@ export function ProjectDialogs({
   dialog,
   name,
   setName,
-  slug,
+  roomId,
   isLoading,
+  error,
   close,
   submitCreate,
   submitRename,
@@ -65,9 +67,10 @@ export function ProjectDialogs({
             placeholder="My architecture project"
             className="text-copy-primary"
           />
-          <p className="text-sm text-copy-muted">
-            {slug || "your-project-slug"}
-          </p>
+          <p className="text-sm text-copy-muted">{roomId}</p>
+          {dialog?.type === "create" && error ? (
+            <p className="text-sm text-error">{error}</p>
+          ) : null}
         </div>
       </EditorDialog>
 
@@ -94,17 +97,22 @@ export function ProjectDialogs({
           </Button>
         }
       >
-        <Input
-          id="project-name-input"
-          autoFocus
-          aria-label="Project name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") submitRename()
-          }}
-          className="text-copy-primary"
-        />
+        <div className="flex flex-col gap-2">
+          <Input
+            id="project-name-input"
+            autoFocus
+            aria-label="Project name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submitRename()
+            }}
+            className="text-copy-primary"
+          />
+          {dialog?.type === "rename" && error ? (
+            <p className="text-sm text-error">{error}</p>
+          ) : null}
+        </div>
       </EditorDialog>
 
       <EditorDialog
@@ -130,7 +138,11 @@ export function ProjectDialogs({
             Delete project
           </Button>
         }
-      />
+      >
+        {dialog?.type === "delete" && error ? (
+          <p className="text-sm text-error">{error}</p>
+        ) : null}
+      </EditorDialog>
     </>
   )
 }
