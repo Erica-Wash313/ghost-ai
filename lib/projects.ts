@@ -19,7 +19,11 @@ function toProject(project: PrismaProject, isOwner: boolean): Project {
 
 async function getVerifiedEmail(): Promise<string | null> {
   const user = await currentUser()
-  return user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null
+  const primaryEmail = user?.primaryEmailAddress
+
+  if (primaryEmail?.verification?.status !== "verified") return null
+
+  return primaryEmail.emailAddress.toLowerCase()
 }
 
 export async function getProjectsForUser(userId: string): Promise<ProjectLists> {
