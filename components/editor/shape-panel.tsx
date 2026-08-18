@@ -27,28 +27,33 @@ const SHAPE_ITEMS: { shape: NodeShape; label: string; Icon: LucideIcon }[] = [
   { shape: "hexagon", label: "Hexagon", Icon: Hexagon },
 ]
 
-function handleDragStart(event: DragEvent<HTMLDivElement>, shape: NodeShape) {
+function handleDragStart(event: DragEvent<HTMLButtonElement>, shape: NodeShape) {
   const { width, height } = DEFAULT_SHAPE_SIZE[shape]
   const payload: ShapeDragPayload = { shape, width, height }
   event.dataTransfer.setData(SHAPE_DRAG_MIME_TYPE, JSON.stringify(payload))
   event.dataTransfer.effectAllowed = "move"
 }
 
-export function ShapePanel() {
+interface ShapePanelProps {
+  onShapeSelect: (shape: NodeShape) => void
+}
+
+export function ShapePanel({ onShapeSelect }: ShapePanelProps) {
   return (
     <div className="flex items-center gap-1 rounded-full border border-surface-border bg-surface p-1.5 shadow-lg">
       {SHAPE_ITEMS.map(({ shape, label, Icon }) => (
-        <div
+        <button
           key={shape}
-          role="button"
-          aria-label={`Drag to add a ${label.toLowerCase()} node`}
+          type="button"
+          aria-label={`Add a ${label.toLowerCase()} node`}
           title={label}
           draggable
           onDragStart={(event) => handleDragStart(event, shape)}
-          className="flex size-9 cursor-grab items-center justify-center rounded-full text-copy-secondary transition-colors hover:bg-elevated hover:text-copy-primary active:cursor-grabbing"
+          onClick={() => onShapeSelect(shape)}
+          className="flex size-9 cursor-grab items-center justify-center rounded-full text-copy-secondary outline-none transition-colors hover:bg-elevated hover:text-copy-primary focus-visible:ring-3 focus-visible:ring-ring/50 active:cursor-grabbing"
         >
           <Icon className="size-5" />
-        </div>
+        </button>
       ))}
     </div>
   )
