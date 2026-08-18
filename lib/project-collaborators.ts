@@ -6,6 +6,7 @@ import type { Collaborator, ProjectOwner } from "@/types/collaborator"
 const CLERK_EMAIL_BATCH_SIZE = 100
 
 interface ClerkUserProfile {
+  readonly id: string
   readonly fullName: string | null
   readonly username: string | null
   readonly imageUrl: string
@@ -46,7 +47,7 @@ function getUserByEmail(
   return usersByEmail
 }
 
-async function getClerkUsersByEmail(
+export async function getClerkUsersByEmail(
   emails: string[],
 ): Promise<Map<string, ClerkUserProfile>> {
   if (emails.length === 0) return new Map()

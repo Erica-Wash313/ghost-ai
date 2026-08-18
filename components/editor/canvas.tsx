@@ -20,9 +20,11 @@ import {
 import { CanvasNodeRenderer } from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
 import {
+  DEFAULT_SHAPE_SIZE,
   SHAPE_DRAG_MIME_TYPE,
   type CanvasEdge,
   type CanvasNode,
+  type NodeShape,
   type ShapeDragPayload,
 } from "@/types/canvas"
 
@@ -36,7 +38,25 @@ function CanvasContent() {
       nodes: { initial: [] },
       edges: { initial: [] },
     })
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const dropCounterRef = useRef(0)
+
+  const createShapeNode = useCallback(
+    (payload: ShapeDragPayload, position: { x: number; y: number }) => {
+      dropCounterRef.current += 1
+      const newNode: CanvasNode = {
+        id: `${payload.shape}-${Date.now()}-${dropCounterRef.current}-${crypto.randomUUID()}`,
+        type: "canvasNode",
+        position,
+        width: payload.width,
+        height: payload.height,
+        data: { label: "", color: "default", shape: payload.shape },
+      }
+
+      onNodesChange([{ type: "add", item: newNode }])
+    },
+    [onNodesChange]
+  )
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -52,24 +72,28 @@ function CanvasContent() {
 
       const payload = JSON.parse(raw) as ShapeDragPayload
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
-
-      dropCounterRef.current += 1
-      const newNode: CanvasNode = {
-        id: `${payload.shape}-${Date.now()}-${dropCounterRef.current}`,
-        type: "canvasNode",
-        position,
-        width: payload.width,
-        height: payload.height,
-        data: { label: "", color: "default", shape: payload.shape },
-      }
-
-      onNodesChange([{ type: "add", item: newNode }])
+      createShapeNode(payload, position)
     },
-    [onNodesChange, screenToFlowPosition]
+    [createShapeNode, screenToFlowPosition]
+  )
+
+  const handleShapeSelect = useCallback(
+    (shape: NodeShape) => {
+      const rect = wrapperRef.current?.getBoundingClientRect()
+      const center = rect
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+      const flowCenter = screenToFlowPosition(center)
+      const { width, height } = DEFAULT_SHAPE_SIZE[shape]
+      const position = { x: flowCenter.x - width / 2, y: flowCenter.y - height / 2 }
+      createShapeNode({ shape, width, height }, position)
+    },
+    [createShapeNode, screenToFlowPosition]
   )
 
   return (
     <div
+      ref={wrapperRef}
       className="relative flex-1 bg-base"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -89,7 +113,7 @@ function CanvasContent() {
         <Background variant={BackgroundVariant.Dots} />
         <MiniMap />
         <Panel position="bottom-center">
-          <ShapePanel />
+          <ShapePanel onShapeSelect={handleShapeSelect} />
         </Panel>
       </ReactFlow>
     </div>

@@ -40,8 +40,11 @@ export async function POST(request: NextRequest) {
 
   const liveblocks = getLiveblocksClient()
 
-  await liveblocks.getOrCreateRoom(projectId, {
-    defaultAccesses: ["room:write"],
+  await liveblocks.upsertRoom(projectId, {
+    update: {
+      defaultAccesses: [],
+      usersAccesses: { [userId]: ["room:write"] },
+    },
   })
 
   const user = await currentUser()
