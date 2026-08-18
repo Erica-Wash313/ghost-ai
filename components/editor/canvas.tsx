@@ -83,8 +83,10 @@ function CanvasContent() {
       const center = rect
         ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
         : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
-      const position = screenToFlowPosition(center)
-      createShapeNode({ shape, ...DEFAULT_SHAPE_SIZE[shape] }, position)
+      const flowCenter = screenToFlowPosition(center)
+      const { width, height } = DEFAULT_SHAPE_SIZE[shape]
+      const position = { x: flowCenter.x - width / 2, y: flowCenter.y - height / 2 }
+      createShapeNode({ shape, width, height }, position)
     },
     [createShapeNode, screenToFlowPosition]
   )
