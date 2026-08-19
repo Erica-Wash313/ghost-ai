@@ -39,6 +39,8 @@ export function useKeyboardShortcuts({ reactFlowInstance, undo, redo }: UseKeybo
         return
       }
 
+      if (isModifierPressed) return
+
       if (event.key === "+" || event.key === "=") {
         event.preventDefault()
         reactFlowInstance.zoomIn({ duration: ZOOM_DURATION })

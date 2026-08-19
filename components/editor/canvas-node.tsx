@@ -22,7 +22,7 @@ export const NodeActionsContext = createContext<NodeActions | null>(null)
 // receive connections — no need for a stacked source+target pair per side.
 const HANDLE_POSITIONS = [Position.Top, Position.Right, Position.Bottom, Position.Left]
 const HANDLE_CLASSNAME =
-  "!size-2 !border !border-[var(--bg-base)] !bg-[var(--handle-fill)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+  "size-2! border! border-[var(--bg-base)]! bg-[var(--handle-fill)]! opacity-0 transition-opacity duration-150 group-hover:opacity-100"
 
 export function CanvasNodeRenderer({ id, data, width, height, selected }: NodeProps<CanvasNode>) {
   const nodeActions = useContext(NodeActionsContext)
