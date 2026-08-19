@@ -83,6 +83,13 @@ export function CanvasEdgeRenderer({
     setIsEditing(false)
   }
 
+  function handleLabelButtonKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault()
+      startEditing()
+    }
+  }
+
   const label = savedLabel.trim()
   const isBright = isHovered || selected
 
@@ -137,9 +144,20 @@ export function CanvasEdgeRenderer({
             <button
               type="button"
               onDoubleClick={startEditing}
+              onKeyDown={handleLabelButtonKeyDown}
               className="cursor-text rounded-full border border-surface-border bg-surface px-2 py-0.5 text-xs text-copy-secondary shadow-md"
             >
               {label}
+            </button>
+          ) : selected ? (
+            <button
+              type="button"
+              onDoubleClick={startEditing}
+              onKeyDown={handleLabelButtonKeyDown}
+              aria-label="Add edge label"
+              className="cursor-text rounded-full border border-surface-border bg-surface px-2 py-0.5 text-xs text-copy-faint shadow-md"
+            >
+              {LABEL_HINT}
             </button>
           ) : null}
         </div>

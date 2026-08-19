@@ -14,7 +14,7 @@ import {
   type DragEvent,
 } from "react"
 import { Cursors, useLiveblocksFlow } from "@liveblocks/react-flow"
-import { useCanRedo, useCanUndo, useRedo, useUndo } from "@liveblocks/react"
+import { useCanRedo, useCanUndo, useRedo, useRoom, useUndo } from "@liveblocks/react"
 import {
   Background,
   BackgroundVariant,
@@ -53,6 +53,19 @@ const defaultEdgeOptions: DefaultEdgeOptions = {
   markerEnd: EDGE_MARKER_END,
 }
 
+// markerEnd round-trips through Liveblocks Storage as a freshly deserialized
+// object every time, so it never `===` EDGE_MARKER_END even once already
+// promoted — compare fields instead, or the promotion effect below would
+// re-fire (and re-write Storage) forever.
+function hasCanvasMarkerEnd(markerEnd: CanvasEdge["markerEnd"]) {
+  return (
+    typeof markerEnd === "object" &&
+    markerEnd !== null &&
+    markerEnd.type === EDGE_MARKER_END.type &&
+    markerEnd.color === EDGE_MARKER_END.color
+  )
+}
+
 const ZOOM_DURATION = 200
 
 export interface CanvasHandle {
@@ -70,6 +83,7 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
     })
   const wrapperRef = useRef<HTMLDivElement>(null)
   const dropCounterRef = useRef(0)
+  const room = useRoom()
 
   const undo = useUndo()
   const redo = useRedo()
@@ -92,10 +106,12 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
   // edge has no type/data yet. Promote it to the custom canvas edge as soon as
   // it shows up, through the same collaborative edge data flow as label edits.
   useEffect(() => {
-    const untyped = edges.filter((edge) => edge.type !== "canvasEdge")
-    if (untyped.length === 0) return
+    const needsPromotion = edges.filter(
+      (edge) => edge.type !== "canvasEdge" || !hasCanvasMarkerEnd(edge.markerEnd)
+    )
+    if (needsPromotion.length === 0) return
     onEdgesChange(
-      untyped.map((edge) => ({
+      needsPromotion.map((edge) => ({
         type: "replace",
         id: edge.id,
         item: {
@@ -211,18 +227,24 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
         target: idMap.get(edge.target) ?? edge.target,
       }))
 
-      onNodesChange([
-        ...nodesRef.current.map((node) => ({ type: "remove" as const, id: node.id })),
-        ...newNodes.map((item) => ({ type: "add" as const, item })),
-      ])
-      onEdgesChange([
-        ...edgesRef.current.map((edge) => ({ type: "remove" as const, id: edge.id })),
-        ...newEdges.map((item) => ({ type: "add" as const, item })),
-      ])
+      // Each of onNodesChange/onEdgesChange is itself a Liveblocks mutation
+      // (its own room.batch under the hood) — without an outer batch here,
+      // the clear-and-replace would land as two separate history entries and
+      // remote clients would briefly see the new nodes with no edges yet.
+      room.batch(() => {
+        onNodesChange([
+          ...nodesRef.current.map((node) => ({ type: "remove" as const, id: node.id })),
+          ...newNodes.map((item) => ({ type: "add" as const, item })),
+        ])
+        onEdgesChange([
+          ...edgesRef.current.map((edge) => ({ type: "remove" as const, id: edge.id })),
+          ...newEdges.map((item) => ({ type: "add" as const, item })),
+        ])
+      })
 
       requestAnimationFrame(() => fitView({ duration: ZOOM_DURATION }))
     },
-    [fitView, onEdgesChange, onNodesChange]
+    [fitView, onEdgesChange, onNodesChange, room]
   )
 
   useImperativeHandle(ref, () => ({ importTemplate }), [importTemplate])

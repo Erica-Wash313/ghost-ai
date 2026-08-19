@@ -1,4 +1,10 @@
+import { MarkerType, Position } from "@xyflow/react"
+
 import { DEFAULT_SHAPE_SIZE, type CanvasEdge, type CanvasNode, type NodeColor, type NodeShape } from "@/types/canvas"
+
+// Matches canvas.tsx's EDGE_MARKER_END — kept local since importing it back
+// from canvas.tsx (a "use client" component) would create a circular import.
+const EDGE_MARKER_END = { type: MarkerType.ArrowClosed, color: "var(--edge-default-color)" }
 
 export interface CanvasTemplate {
   id: string
@@ -30,13 +36,28 @@ function templateNode(
   }
 }
 
-function templateEdge(id: string, source: string, target: string, label = ""): CanvasEdge {
+// sourceHandle/targetHandle are required, not optional: canvas-node.tsx
+// registers four same-type ("source") handles per node, so React Flow's
+// default handle resolution (used whenever an edge omits them) just picks
+// the first one registered ("top") for both ends, regardless of where the
+// nodes actually sit — every edge would render as a top-to-top stub.
+function templateEdge(
+  id: string,
+  source: string,
+  sourceHandle: Position,
+  target: string,
+  targetHandle: Position,
+  label = ""
+): CanvasEdge {
   return {
     id,
     type: "canvasEdge",
     source,
+    sourceHandle,
     target,
+    targetHandle,
     data: { label },
+    markerEnd: EDGE_MARKER_END,
   }
 }
 
@@ -55,13 +76,19 @@ const microservices: CanvasTemplate = {
     templateNode("inventory-db", "Inventory DB", "cylinder", "teal", 460, 460),
   ],
   edges: [
-    templateEdge("client-gateway", "client", "gateway"),
-    templateEdge("gateway-auth", "gateway", "auth-service"),
-    templateEdge("gateway-orders", "gateway", "orders-service"),
-    templateEdge("gateway-inventory", "gateway", "inventory-service"),
-    templateEdge("auth-authdb", "auth-service", "auth-db"),
-    templateEdge("orders-ordersdb", "orders-service", "orders-db"),
-    templateEdge("inventory-inventorydb", "inventory-service", "inventory-db"),
+    templateEdge("client-gateway", "client", Position.Bottom, "gateway", Position.Top),
+    templateEdge("gateway-auth", "gateway", Position.Bottom, "auth-service", Position.Top),
+    templateEdge("gateway-orders", "gateway", Position.Bottom, "orders-service", Position.Top),
+    templateEdge("gateway-inventory", "gateway", Position.Bottom, "inventory-service", Position.Top),
+    templateEdge("auth-authdb", "auth-service", Position.Bottom, "auth-db", Position.Top),
+    templateEdge("orders-ordersdb", "orders-service", Position.Bottom, "orders-db", Position.Top),
+    templateEdge(
+      "inventory-inventorydb",
+      "inventory-service",
+      Position.Bottom,
+      "inventory-db",
+      Position.Top
+    ),
   ],
 }
 
@@ -78,11 +105,11 @@ const cicdPipeline: CanvasTemplate = {
     templateNode("production", "Deploy to Production", "pill", "red", 820, 200),
   ],
   edges: [
-    templateEdge("commit-build", "commit", "build"),
-    templateEdge("build-test", "build", "test"),
-    templateEdge("test-gate", "test", "gate"),
-    templateEdge("gate-staging", "gate", "staging", "on merge"),
-    templateEdge("gate-production", "gate", "production", "on release"),
+    templateEdge("commit-build", "commit", Position.Right, "build", Position.Left),
+    templateEdge("build-test", "build", Position.Right, "test", Position.Left),
+    templateEdge("test-gate", "test", Position.Right, "gate", Position.Left),
+    templateEdge("gate-staging", "gate", Position.Right, "staging", Position.Left, "on merge"),
+    templateEdge("gate-production", "gate", Position.Right, "production", Position.Left, "on release"),
   ],
 }
 
@@ -99,11 +126,11 @@ const eventDriven: CanvasTemplate = {
     templateNode("consumer-c", "Audit Log", "cylinder", "teal", 540, 300),
   ],
   edges: [
-    templateEdge("producer-a-broker", "producer-a", "broker", "publish"),
-    templateEdge("producer-b-broker", "producer-b", "broker", "publish"),
-    templateEdge("broker-consumer-a", "broker", "consumer-a", "subscribe"),
-    templateEdge("broker-consumer-b", "broker", "consumer-b", "subscribe"),
-    templateEdge("broker-consumer-c", "broker", "consumer-c", "subscribe"),
+    templateEdge("producer-a-broker", "producer-a", Position.Right, "broker", Position.Left, "publish"),
+    templateEdge("producer-b-broker", "producer-b", Position.Right, "broker", Position.Left, "publish"),
+    templateEdge("broker-consumer-a", "broker", Position.Right, "consumer-a", Position.Left, "subscribe"),
+    templateEdge("broker-consumer-b", "broker", Position.Right, "consumer-b", Position.Left, "subscribe"),
+    templateEdge("broker-consumer-c", "broker", Position.Right, "consumer-c", Position.Left, "subscribe"),
   ],
 }
 
