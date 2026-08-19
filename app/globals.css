@@ -110,6 +110,7 @@
     --node-teal-fill: #062822;
     --node-teal-text: #0AC7B4;
     --edge-default-color: #f8fafc;
+    --handle-fill: #ffffff;
 
     /*
      * shadcn/ui adapter layer: components/ui/* is generated and not

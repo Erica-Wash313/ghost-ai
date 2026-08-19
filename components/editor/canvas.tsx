@@ -4,34 +4,64 @@ import "@xyflow/react/dist/style.css"
 import "@liveblocks/react-ui/styles.css"
 import "@liveblocks/react-flow/styles.css"
 
-import { useCallback, useRef, type DragEvent } from "react"
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type DragEvent,
+} from "react"
 import { Cursors, useLiveblocksFlow } from "@liveblocks/react-flow"
+import { useCanRedo, useCanUndo, useRedo, useUndo } from "@liveblocks/react"
 import {
   Background,
   BackgroundVariant,
   ConnectionMode,
-  MiniMap,
+  MarkerType,
   Panel,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type DefaultEdgeOptions,
 } from "@xyflow/react"
 
-import { CanvasNodeRenderer } from "@/components/editor/canvas-node"
+import { CanvasControlBar } from "@/components/editor/canvas-control-bar"
+import { CanvasEdgeRenderer, EdgeActionsContext } from "@/components/editor/canvas-edge"
+import { CanvasNodeRenderer, NodeActionsContext } from "@/components/editor/canvas-node"
 import { ShapePanel } from "@/components/editor/shape-panel"
+import type { CanvasTemplate } from "@/components/editor/starter-templates"
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import {
   DEFAULT_SHAPE_SIZE,
   SHAPE_DRAG_MIME_TYPE,
   type CanvasEdge,
   type CanvasNode,
+  type NodeColor,
   type NodeShape,
   type ShapeDragPayload,
 } from "@/types/canvas"
 
 const nodeTypes = { canvasNode: CanvasNodeRenderer }
+const edgeTypes = { canvasEdge: CanvasEdgeRenderer }
 
-function CanvasContent() {
-  const { screenToFlowPosition } = useReactFlow()
+const EDGE_MARKER_END = { type: MarkerType.ArrowClosed, color: "var(--edge-default-color)" }
+const defaultEdgeOptions: DefaultEdgeOptions = {
+  type: "canvasEdge",
+  data: { label: "" },
+  markerEnd: EDGE_MARKER_END,
+}
+
+const ZOOM_DURATION = 200
+
+export interface CanvasHandle {
+  importTemplate: (template: CanvasTemplate) => void
+}
+
+const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, ref) {
+  const reactFlowInstance = useReactFlow()
+  const { screenToFlowPosition, zoomIn, zoomOut, fitView } = reactFlowInstance
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -40,6 +70,74 @@ function CanvasContent() {
     })
   const wrapperRef = useRef<HTMLDivElement>(null)
   const dropCounterRef = useRef(0)
+
+  const undo = useUndo()
+  const redo = useRedo()
+  const canUndo = useCanUndo()
+  const canRedo = useCanRedo()
+
+  useKeyboardShortcuts({ reactFlowInstance, undo, redo })
+
+  const nodesRef = useRef(nodes)
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
+  const edgesRef = useRef(edges)
+  useEffect(() => {
+    edgesRef.current = edges
+  }, [edges])
+
+  // useLiveblocksFlow's onConnect builds new edges with @xyflow/react's plain
+  // `addEdge`, which doesn't apply defaultEdgeOptions — so a freshly connected
+  // edge has no type/data yet. Promote it to the custom canvas edge as soon as
+  // it shows up, through the same collaborative edge data flow as label edits.
+  useEffect(() => {
+    const untyped = edges.filter((edge) => edge.type !== "canvasEdge")
+    if (untyped.length === 0) return
+    onEdgesChange(
+      untyped.map((edge) => ({
+        type: "replace",
+        id: edge.id,
+        item: {
+          ...edge,
+          type: "canvasEdge",
+          data: { label: edge.data?.label ?? "" },
+          markerEnd: EDGE_MARKER_END,
+        },
+      }))
+    )
+  }, [edges, onEdgesChange])
+
+  const updateNodeLabel = useCallback(
+    (id: string, label: string) => {
+      const node = nodesRef.current.find((candidate) => candidate.id === id)
+      if (!node) return
+      onNodesChange([{ type: "replace", id, item: { ...node, data: { ...node.data, label } } }])
+    },
+    [onNodesChange]
+  )
+  const updateNodeColor = useCallback(
+    (id: string, color: NodeColor) => {
+      const node = nodesRef.current.find((candidate) => candidate.id === id)
+      if (!node) return
+      onNodesChange([{ type: "replace", id, item: { ...node, data: { ...node.data, color } } }])
+    },
+    [onNodesChange]
+  )
+  const nodeActions = useMemo(
+    () => ({ updateNodeLabel, updateNodeColor }),
+    [updateNodeLabel, updateNodeColor]
+  )
+
+  const updateEdgeLabel = useCallback(
+    (id: string, label: string) => {
+      const edge = edgesRef.current.find((candidate) => candidate.id === id)
+      if (!edge) return
+      onEdgesChange([{ type: "replace", id, item: { ...edge, data: { ...edge.data, label } } }])
+    },
+    [onEdgesChange]
+  )
+  const edgeActions = useMemo(() => ({ updateEdgeLabel }), [updateEdgeLabel])
 
   const createShapeNode = useCallback(
     (payload: ShapeDragPayload, position: { x: number; y: number }) => {
@@ -71,7 +169,11 @@ function CanvasContent() {
       if (!raw) return
 
       const payload = JSON.parse(raw) as ShapeDragPayload
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      const flowCenter = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+      const position = {
+        x: flowCenter.x - payload.width / 2,
+        y: flowCenter.y - payload.height / 2,
+      }
       createShapeNode(payload, position)
     },
     [createShapeNode, screenToFlowPosition]
@@ -91,6 +193,40 @@ function CanvasContent() {
     [createShapeNode, screenToFlowPosition]
   )
 
+  const importTemplate = useCallback(
+    (template: CanvasTemplate) => {
+      // Template nodes/edges carry template-local ids — remap them to fresh,
+      // cross-client-unique ids on import (same reasoning as createShapeNode's
+      // ids: two clients importing at once must not collide).
+      const idMap = new Map<string, string>()
+      const newNodes: CanvasNode[] = template.nodes.map((node) => {
+        const id = `${node.id}-${crypto.randomUUID()}`
+        idMap.set(node.id, id)
+        return { ...node, id }
+      })
+      const newEdges: CanvasEdge[] = template.edges.map((edge) => ({
+        ...edge,
+        id: `${edge.id}-${crypto.randomUUID()}`,
+        source: idMap.get(edge.source) ?? edge.source,
+        target: idMap.get(edge.target) ?? edge.target,
+      }))
+
+      onNodesChange([
+        ...nodesRef.current.map((node) => ({ type: "remove" as const, id: node.id })),
+        ...newNodes.map((item) => ({ type: "add" as const, item })),
+      ])
+      onEdgesChange([
+        ...edgesRef.current.map((edge) => ({ type: "remove" as const, id: edge.id })),
+        ...newEdges.map((item) => ({ type: "add" as const, item })),
+      ])
+
+      requestAnimationFrame(() => fitView({ duration: ZOOM_DURATION }))
+    },
+    [fitView, onEdgesChange, onNodesChange]
+  )
+
+  useImperativeHandle(ref, () => ({ importTemplate }), [importTemplate])
+
   return (
     <div
       ref={wrapperRef}
@@ -98,32 +234,48 @@ function CanvasContent() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onDelete={onDelete}
-        connectionMode={ConnectionMode.Loose}
-        fitView
-      >
-        <Cursors />
-        <Background variant={BackgroundVariant.Dots} />
-        <MiniMap />
-        <Panel position="bottom-center">
-          <ShapePanel onShapeSelect={handleShapeSelect} />
-        </Panel>
-      </ReactFlow>
+      <NodeActionsContext.Provider value={nodeActions}>
+        <EdgeActionsContext.Provider value={edgeActions}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={defaultEdgeOptions}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDelete={onDelete}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+          >
+            <Cursors />
+            <Background variant={BackgroundVariant.Dots} />
+            <Panel position="bottom-center">
+              <ShapePanel onShapeSelect={handleShapeSelect} />
+            </Panel>
+            <Panel position="bottom-left">
+              <CanvasControlBar
+                onZoomIn={() => zoomIn({ duration: ZOOM_DURATION })}
+                onZoomOut={() => zoomOut({ duration: ZOOM_DURATION })}
+                onFitView={() => fitView({ duration: ZOOM_DURATION })}
+                onUndo={undo}
+                onRedo={redo}
+                canUndo={canUndo}
+                canRedo={canRedo}
+              />
+            </Panel>
+          </ReactFlow>
+        </EdgeActionsContext.Provider>
+      </NodeActionsContext.Provider>
     </div>
   )
-}
+})
 
-export function Canvas() {
+export const Canvas = forwardRef<CanvasHandle>(function Canvas(_props, ref) {
   return (
     <ReactFlowProvider>
-      <CanvasContent />
+      <CanvasContent ref={ref} />
     </ReactFlowProvider>
   )
-}
+})

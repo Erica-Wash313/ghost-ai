@@ -1,27 +1,31 @@
 "use client"
 
+import { forwardRef } from "react"
 import { ClientSideSuspense, LiveblocksProvider, RoomProvider } from "@liveblocks/react"
 import { ErrorBoundary } from "react-error-boundary"
 
-import { Canvas } from "@/components/editor/canvas"
+import { Canvas, type CanvasHandle } from "@/components/editor/canvas"
 
 interface CanvasRoomProps {
   roomId: string
 }
 
-export function CanvasRoom({ roomId }: CanvasRoomProps) {
+export const CanvasRoom = forwardRef<CanvasHandle, CanvasRoomProps>(function CanvasRoom(
+  { roomId },
+  ref
+) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
       <RoomProvider id={roomId} initialPresence={{ cursor: null, isThinking: false }}>
         <ErrorBoundary fallback={<CanvasConnectionError />}>
           <ClientSideSuspense fallback={<CanvasLoading />}>
-            <Canvas />
+            <Canvas ref={ref} />
           </ClientSideSuspense>
         </ErrorBoundary>
       </RoomProvider>
     </LiveblocksProvider>
   )
-}
+})
 
 function CanvasLoading() {
   return (

@@ -83,7 +83,7 @@ Smooth-step path with an arrow marker. Default edge color: `--edge-default-color
 
 ### Connection Handles
 
-Small white circular handles, hidden by default, revealed on node hover. Appear at all four sides of a node.
+Small white circular handles (`--handle-fill` in globals.css, dark border matching `--bg-base`), hidden by default, revealed on node hover. Appear at all four sides of a node.
 
 ### Canvas Background
 

@@ -32,7 +32,11 @@ export interface CanvasNodeData extends Record<string, unknown> {
 
 export type CanvasNode = Node<CanvasNodeData, "canvasNode">
 
-export type CanvasEdge = Edge<Record<string, never>, "canvasEdge">
+export interface CanvasEdgeData extends Record<string, unknown> {
+  label: string
+}
+
+export type CanvasEdge = Edge<CanvasEdgeData, "canvasEdge">
 
 export const SHAPE_DRAG_MIME_TYPE = "application/x-ghost-shape"
 
