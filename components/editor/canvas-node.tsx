@@ -1,122 +1,106 @@
-import type { ReactElement } from "react"
-import type { NodeProps } from "@xyflow/react"
+"use client"
 
-import type { CanvasNode, NodeShape } from "@/types/canvas"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
+import type { ChangeEvent, KeyboardEvent } from "react"
+import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react"
 
-const DEFAULT_WIDTH = 160
-const DEFAULT_HEIGHT = 80
+import { NodeColorToolbar } from "@/components/editor/node-color-toolbar"
+import { LABEL_PLACEHOLDER, MIN_NODE_HEIGHT, MIN_NODE_WIDTH, ShapeVisual } from "@/components/editor/shape-visual"
+import type { CanvasNode, NodeColor } from "@/types/canvas"
 
-interface ShapeSvgProps {
-  width: number
-  height: number
-  fill: string
-  stroke: string
+interface NodeActions {
+  updateNodeLabel: (id: string, label: string) => void
+  updateNodeColor: (id: string, color: NodeColor) => void
 }
 
-function DiamondShape({ width, height, fill, stroke }: ShapeSvgProps) {
-  return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="absolute inset-0"
-      aria-hidden
-    >
-      <polygon
-        points={`${width / 2},0 ${width},${height / 2} ${width / 2},${height} 0,${height / 2}`}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
+// Lets the node renderer push label/color edits through the same Liveblocks-synced
+// onNodesChange used elsewhere, without threading callbacks through node data.
+export const NodeActionsContext = createContext<NodeActions | null>(null)
 
-function HexagonShape({ width, height, fill, stroke }: ShapeSvgProps) {
-  const inset = width * 0.2
-  return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="absolute inset-0"
-      aria-hidden
-    >
-      <polygon
-        points={`${inset},0 ${width - inset},0 ${width},${height / 2} ${width - inset},${height} ${inset},${height} 0,${height / 2}`}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
+// One handle per side, each acting as both a source and target: connectionMode
+// is Loose (see canvas.tsx), so a single "source" handle can both start and
+// receive connections — no need for a stacked source+target pair per side.
+const HANDLE_POSITIONS = [Position.Top, Position.Right, Position.Bottom, Position.Left]
+const HANDLE_CLASSNAME =
+  "!size-2 !border !border-[var(--bg-base)] !bg-[var(--handle-fill)] opacity-0 transition-opacity duration-150 group-hover:opacity-100"
 
-function CylinderShape({ width, height, fill, stroke }: ShapeSvgProps) {
-  const rx = width / 2
-  const ry = Math.min(height * 0.16, 16)
-  const bodyPath = `M 0 ${ry} L 0 ${height - ry} A ${rx} ${ry} 0 0 0 ${width} ${height - ry} L ${width} ${ry} A ${rx} ${ry} 0 0 0 0 ${ry} Z`
+export function CanvasNodeRenderer({ id, data, width, height, selected }: NodeProps<CanvasNode>) {
+  const nodeActions = useContext(NodeActionsContext)
+  const [isEditing, setIsEditing] = useState(false)
+  const [draftLabel, setDraftLabel] = useState(data.label)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="absolute inset-0"
-      aria-hidden
-    >
-      <path d={bodyPath} fill={fill} stroke={stroke} strokeWidth={1.5} strokeLinejoin="round" />
-      <ellipse cx={rx} cy={ry} rx={rx - 0.75} ry={ry - 0.75} fill={fill} stroke={stroke} strokeWidth={1.5} />
-    </svg>
-  )
-}
+  useEffect(() => {
+    if (isEditing) {
+      textareaRef.current?.focus()
+      textareaRef.current?.select()
+    }
+  }, [isEditing])
 
-const SVG_SHAPES: Partial<Record<NodeShape, (props: ShapeSvgProps) => ReactElement>> = {
-  diamond: DiamondShape,
-  hexagon: HexagonShape,
-  cylinder: CylinderShape,
-}
-
-function borderRadiusClassName(shape: NodeShape) {
-  switch (shape) {
-    case "circle":
-    case "pill":
-      return "rounded-full"
-    case "rectangle":
-    default:
-      return "rounded-xl"
+  function startEditing() {
+    setDraftLabel(data.label)
+    setIsEditing(true)
   }
-}
 
-export function CanvasNodeRenderer({ data, width, height }: NodeProps<CanvasNode>) {
-  const w = width ?? DEFAULT_WIDTH
-  const h = height ?? DEFAULT_HEIGHT
-  const fill = `var(--node-${data.color}-fill)`
-  const stroke = `var(--node-${data.color}-text)`
-  const SvgShape = SVG_SHAPES[data.shape]
+  function handleChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    const value = event.target.value
+    setDraftLabel(value)
+    nodeActions?.updateNodeLabel(id, value)
+  }
 
-  if (SvgShape) {
-    return (
-      <div className="relative flex items-center justify-center" style={{ width: w, height: h }}>
-        <SvgShape width={w} height={h} fill={fill} stroke={stroke} />
-        <span
-          className="relative z-10 px-2 text-center text-sm"
-          style={{ color: stroke, maxWidth: w * 0.55 }}
-        >
-          {data.label}
-        </span>
-      </div>
-    )
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      textareaRef.current?.blur()
+    }
   }
 
   return (
-    <div
-      className={`flex h-full w-full items-center justify-center border px-3 py-2 text-center text-sm ${borderRadiusClassName(data.shape)}`}
-      style={{ width: w, height: h, backgroundColor: fill, borderColor: stroke, color: stroke }}
-    >
-      {data.label}
+    <div className="group relative size-full" onDoubleClick={startEditing}>
+      {HANDLE_POSITIONS.map((position) => (
+        <Handle key={position} type="source" position={position} id={position} className={HANDLE_CLASSNAME} />
+      ))}
+      {selected && nodeActions && (
+        <div className="nodrag nopan absolute bottom-full left-1/2 mb-2 -translate-x-1/2">
+          <NodeColorToolbar
+            activeColor={data.color}
+            onColorSelect={(color) => nodeActions.updateNodeColor(id, color)}
+          />
+        </div>
+      )}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={MIN_NODE_WIDTH}
+        minHeight={MIN_NODE_HEIGHT}
+        keepAspectRatio
+        handleClassName="!size-2 !rounded-[2px] !border !border-surface-border !bg-elevated"
+        lineClassName="!border-surface-border"
+      />
+      <ShapeVisual
+        shape={data.shape}
+        width={width}
+        height={height}
+        color={data.color}
+        selected={selected}
+        label={data.label}
+        hideLabel={isEditing}
+      />
+      {isEditing && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-2">
+          <textarea
+            ref={textareaRef}
+            className="nodrag nopan pointer-events-auto max-h-full w-full resize-none border-none bg-transparent text-center text-sm outline-none placeholder:text-copy-faint"
+            style={{ color: `var(--node-${data.color}-text)` }}
+            rows={1}
+            value={draftLabel}
+            placeholder={LABEL_PLACEHOLDER}
+            onChange={handleChange}
+            onBlur={() => setIsEditing(false)}
+            onKeyDown={handleKeyDown}
+            onMouseDown={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }

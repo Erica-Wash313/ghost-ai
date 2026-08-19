@@ -1,13 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 
+import type { CanvasHandle } from "@/components/editor/canvas"
 import { EditorHome } from "@/components/editor/editor-home"
 import { EditorNavbar } from "@/components/editor/editor-navbar"
 import { EditorWorkspace } from "@/components/editor/editor-workspace"
 import { ProjectDialogs } from "@/components/editor/project-dialogs"
 import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
+import type { CanvasTemplate } from "@/components/editor/starter-templates"
+import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
 import { useProjectActions } from "@/hooks/use-project-actions"
 import { cn } from "@/lib/utils"
 import type { Project } from "@/types/project"
@@ -26,6 +29,13 @@ export function EditorShell({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
+  const canvasRef = useRef<CanvasHandle>(null)
+
+  function handleImportTemplate(template: CanvasTemplate) {
+    canvasRef.current?.importTemplate(template)
+  }
+
   const {
     dialog,
     name,
@@ -49,6 +59,9 @@ export function EditorShell({
         onToggleSidebar={() => setIsSidebarOpen((open) => !open)}
         projectName={activeProject?.name}
         onShare={activeProject ? () => setIsShareDialogOpen(true) : undefined}
+        onOpenTemplates={
+          activeProject ? () => setIsTemplatesModalOpen(true) : undefined
+        }
         isAiSidebarOpen={isAiSidebarOpen}
         onToggleAiSidebar={
           activeProject ? () => setIsAiSidebarOpen((open) => !open) : undefined
@@ -70,7 +83,11 @@ export function EditorShell({
         )}
       >
         {activeProject ? (
-          <EditorWorkspace project={activeProject} isAiSidebarOpen={isAiSidebarOpen} />
+          <EditorWorkspace
+            ref={canvasRef}
+            project={activeProject}
+            isAiSidebarOpen={isAiSidebarOpen}
+          />
         ) : (
           <EditorHome onCreateProject={openCreate} />
         )}
@@ -93,6 +110,13 @@ export function EditorShell({
           open={isShareDialogOpen}
           onOpenChange={setIsShareDialogOpen}
           project={activeProject}
+        />
+      ) : null}
+      {activeProject ? (
+        <StarterTemplatesModal
+          open={isTemplatesModalOpen}
+          onOpenChange={setIsTemplatesModalOpen}
+          onImport={handleImportTemplate}
         />
       ) : null}
     </div>
