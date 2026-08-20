@@ -11,6 +11,7 @@ import { ProjectSidebar } from "@/components/editor/project-sidebar"
 import { ShareDialog } from "@/components/editor/share-dialog"
 import type { CanvasTemplate } from "@/components/editor/starter-templates"
 import { StarterTemplatesModal } from "@/components/editor/starter-templates-modal"
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
 import { useProjectActions } from "@/hooks/use-project-actions"
 import { cn } from "@/lib/utils"
 import type { Project } from "@/types/project"
@@ -30,6 +31,7 @@ export function EditorShell({
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<CanvasSaveStatus>("idle")
   const canvasRef = useRef<CanvasHandle>(null)
 
   function handleImportTemplate(template: CanvasTemplate) {
@@ -66,6 +68,9 @@ export function EditorShell({
         onToggleAiSidebar={
           activeProject ? () => setIsAiSidebarOpen((open) => !open) : undefined
         }
+        saveStatus={activeProject ? saveStatus : undefined}
+        onSave={activeProject ? () => canvasRef.current?.save() : undefined}
+        context={activeProject ? "workspace" : "home"}
       />
       <ProjectSidebar
         isOpen={isSidebarOpen}
@@ -84,9 +89,12 @@ export function EditorShell({
       >
         {activeProject ? (
           <EditorWorkspace
+            key={activeProject.id}
             ref={canvasRef}
             project={activeProject}
             isAiSidebarOpen={isAiSidebarOpen}
+            onCloseAiSidebar={() => setIsAiSidebarOpen(false)}
+            onSaveStatusChange={setSaveStatus}
           />
         ) : (
           <EditorHome onCreateProject={openCreate} />
