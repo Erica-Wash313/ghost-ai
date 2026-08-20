@@ -11,6 +11,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
   type DragEvent,
 } from "react"
 import { Cursors, useLiveblocksFlow } from "@liveblocks/react-flow"
@@ -28,10 +29,13 @@ import {
 } from "@xyflow/react"
 
 import { CanvasControlBar } from "@/components/editor/canvas-control-bar"
+import { PresenceCursor } from "@/components/editor/canvas-cursor"
 import { CanvasEdgeRenderer, EdgeActionsContext } from "@/components/editor/canvas-edge"
 import { CanvasNodeRenderer, NodeActionsContext } from "@/components/editor/canvas-node"
+import { CanvasPresence } from "@/components/editor/canvas-presence"
 import { ShapePanel } from "@/components/editor/shape-panel"
 import type { CanvasTemplate } from "@/components/editor/starter-templates"
+import { useCanvasAutosave, type CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import {
   DEFAULT_SHAPE_SIZE,
@@ -70,11 +74,19 @@ const ZOOM_DURATION = 200
 
 export interface CanvasHandle {
   importTemplate: (template: CanvasTemplate) => void
+  save: () => Promise<void>
 }
 
-const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, ref) {
+interface CanvasProps {
+  onSaveStatusChange?: (status: CanvasSaveStatus) => void
+}
+
+const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasContent(
+  { onSaveStatusChange },
+  ref
+) {
   const reactFlowInstance = useReactFlow()
-  const { screenToFlowPosition, zoomIn, zoomOut, fitView } = reactFlowInstance
+  const { screenToFlowPosition, zoomIn, zoomOut, fitView, deleteElements } = reactFlowInstance
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onDelete } =
     useLiveblocksFlow<CanvasNode, CanvasEdge>({
       suspense: true,
@@ -100,6 +112,60 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
   useEffect(() => {
     edgesRef.current = edges
   }, [edges])
+
+  // Loads the project's saved canvas from Vercel Blob exactly once, and only
+  // when the room has no live nodes/edges of its own yet - a room with
+  // active content means collaborators are already here, and overwriting
+  // their in-progress work with a stale snapshot would be a real data-loss
+  // bug, not just a redundant fetch.
+  const [isLoadReady, setIsLoadReady] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadSavedCanvasIfEmpty() {
+      if (nodesRef.current.length > 0 || edgesRef.current.length > 0) {
+        setIsLoadReady(true)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/projects/${room.id}/canvas`)
+        if (!cancelled && response.ok) {
+          const data = (await response.json()) as { nodes: CanvasNode[]; edges: CanvasEdge[] }
+          if (data.nodes.length > 0 || data.edges.length > 0) {
+            room.batch(() => {
+              onNodesChange(data.nodes.map((item) => ({ type: "add", item })))
+              onEdgesChange(data.edges.map((item) => ({ type: "add", item })))
+            })
+          }
+        }
+      } catch {
+        // A failed load just means the room stays empty - the user can still
+        // work, and the next autosave (once isLoadReady is set below) will
+        // persist their fresh edits.
+      } finally {
+        if (!cancelled) setIsLoadReady(true)
+      }
+    }
+
+    loadSavedCanvasIfEmpty()
+    return () => {
+      cancelled = true
+    }
+    // Runs once per room connection only - re-running on every nodes/edges
+    // change would re-trigger the empty-room check against live edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room])
+
+  const { status: saveStatus, save } = useCanvasAutosave({
+    projectId: room.id,
+    nodes,
+    edges,
+    enabled: isLoadReady,
+  })
+  useEffect(() => {
+    onSaveStatusChange?.(saveStatus)
+  }, [saveStatus, onSaveStatusChange])
 
   // useLiveblocksFlow's onConnect builds new edges with @xyflow/react's plain
   // `addEdge`, which doesn't apply defaultEdgeOptions — so a freshly connected
@@ -140,9 +206,15 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
     },
     [onNodesChange]
   )
+  const deleteNode = useCallback(
+    (id: string) => {
+      deleteElements({ nodes: [{ id }] })
+    },
+    [deleteElements]
+  )
   const nodeActions = useMemo(
-    () => ({ updateNodeLabel, updateNodeColor }),
-    [updateNodeLabel, updateNodeColor]
+    () => ({ updateNodeLabel, updateNodeColor, deleteNode }),
+    [updateNodeLabel, updateNodeColor, deleteNode]
   )
 
   const updateEdgeLabel = useCallback(
@@ -247,7 +319,7 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
     [fitView, onEdgesChange, onNodesChange, room]
   )
 
-  useImperativeHandle(ref, () => ({ importTemplate }), [importTemplate])
+  useImperativeHandle(ref, () => ({ importTemplate, save }), [importTemplate, save])
 
   return (
     <div
@@ -268,11 +340,15 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onDelete={onDelete}
+            deleteKeyCode={["Backspace", "Delete"]}
             connectionMode={ConnectionMode.Loose}
             fitView
           >
-            <Cursors />
+            <Cursors components={{ Cursor: PresenceCursor }} />
             <Background variant={BackgroundVariant.Dots} />
+            <Panel position="top-right">
+              <CanvasPresence />
+            </Panel>
             <Panel position="bottom-center">
               <ShapePanel onShapeSelect={handleShapeSelect} />
             </Panel>
@@ -294,10 +370,10 @@ const CanvasContent = forwardRef<CanvasHandle>(function CanvasContent(_props, re
   )
 })
 
-export const Canvas = forwardRef<CanvasHandle>(function Canvas(_props, ref) {
+export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(props, ref) {
   return (
     <ReactFlowProvider>
-      <CanvasContent ref={ref} />
+      <CanvasContent ref={ref} {...props} />
     </ReactFlowProvider>
   )
 })

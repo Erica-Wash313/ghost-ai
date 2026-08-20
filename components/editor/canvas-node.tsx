@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import type { ChangeEvent, KeyboardEvent } from "react"
+import { Trash2 } from "lucide-react"
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react"
 
 import { NodeColorToolbar } from "@/components/editor/node-color-toolbar"
@@ -11,6 +12,7 @@ import type { CanvasNode, NodeColor } from "@/types/canvas"
 interface NodeActions {
   updateNodeLabel: (id: string, label: string) => void
   updateNodeColor: (id: string, color: NodeColor) => void
+  deleteNode: (id: string) => void
 }
 
 // Lets the node renderer push label/color edits through the same Liveblocks-synced
@@ -61,11 +63,21 @@ export function CanvasNodeRenderer({ id, data, width, height, selected }: NodePr
         <Handle key={position} type="source" position={position} id={position} className={HANDLE_CLASSNAME} />
       ))}
       {selected && nodeActions && (
-        <div className="nodrag nopan absolute bottom-full left-1/2 mb-2 -translate-x-1/2">
+        <div className="nodrag nopan absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 items-center gap-1.5">
           <NodeColorToolbar
             activeColor={data.color}
             onColorSelect={(color) => nodeActions.updateNodeColor(id, color)}
           />
+          <button
+            type="button"
+            aria-label="Delete node"
+            title="Delete"
+            onClick={() => nodeActions.deleteNode(id)}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="flex size-9 cursor-pointer items-center justify-center rounded-full border border-surface-border bg-surface text-copy-secondary shadow-lg outline-none transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <Trash2 className="size-4" />
+          </button>
         </div>
       )}
       <NodeResizer

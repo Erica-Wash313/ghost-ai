@@ -1,7 +1,20 @@
+import { useEffect, useState } from "react"
+
 import { UserButton } from "@clerk/nextjs"
-import { LayoutTemplate, PanelLeftClose, PanelLeftOpen, Share2, Sparkles } from "lucide-react"
+import {
+  AlertCircle,
+  Check,
+  LayoutTemplate,
+  Loader2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Share2,
+  Sparkles,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
+import { cn } from "@/lib/utils"
 
 interface EditorNavbarProps {
   isSidebarOpen: boolean
@@ -11,6 +24,83 @@ interface EditorNavbarProps {
   onOpenTemplates?: () => void
   isAiSidebarOpen?: boolean
   onToggleAiSidebar?: () => void
+  saveStatus?: CanvasSaveStatus
+  onSave?: () => void
+  context: "home" | "workspace"
+}
+
+const SAVE_BUTTON_REVERT_MS = 2000
+
+function SaveButton({
+  status,
+  onSave,
+}: {
+  status: CanvasSaveStatus
+  onSave: () => void
+}) {
+  const [label, setLabel] = useState("Save")
+
+  useEffect(() => {
+    if (status === "saving") {
+      setLabel("Saving…")
+      return
+    }
+    if (status === "saved" || status === "error") {
+      setLabel(status === "saved" ? "Saved" : "Error")
+      const timeoutId = setTimeout(() => setLabel("Save"), SAVE_BUTTON_REVERT_MS)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [status])
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5 rounded-full"
+      onClick={onSave}
+      disabled={status === "saving"}
+    >
+      {label}
+    </Button>
+  )
+}
+
+const SAVE_STATUS_CONFIG: Record<
+  CanvasSaveStatus,
+  { label: string; className: string; icon: React.ReactNode } | null
+> = {
+  idle: null,
+  saving: {
+    label: "Saving…",
+    className: "text-copy-muted",
+    icon: <Loader2 className="size-3.5 animate-spin" />,
+  },
+  saved: {
+    label: "Saved",
+    className: "text-copy-muted",
+    icon: <Check className="size-3.5" />,
+  },
+  error: {
+    label: "Error saving",
+    className: "text-error",
+    icon: <AlertCircle className="size-3.5" />,
+  },
+}
+
+function SaveStatusIndicator({ status }: { status: CanvasSaveStatus }) {
+  const config = SAVE_STATUS_CONFIG[status]
+  if (!config) return null
+
+  return (
+    <span
+      className={cn("flex items-center gap-1.5 text-xs", config.className)}
+      role="status"
+      aria-live="polite"
+    >
+      {config.icon}
+      {config.label}
+    </span>
+  )
 }
 
 export function EditorNavbar({
@@ -21,6 +111,9 @@ export function EditorNavbar({
   onOpenTemplates,
   isAiSidebarOpen,
   onToggleAiSidebar,
+  saveStatus,
+  onSave,
+  context,
 }: EditorNavbarProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-surface-border bg-base px-4">
@@ -46,7 +139,9 @@ export function EditorNavbar({
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {saveStatus && <SaveStatusIndicator status={saveStatus} />}
+        {onSave && <SaveButton status={saveStatus ?? "idle"} onSave={onSave} />}
         {onOpenTemplates && (
           <Button
             variant="outline"
@@ -83,7 +178,7 @@ export function EditorNavbar({
             AI
           </Button>
         )}
-        <UserButton />
+        {context === "home" && <UserButton />}
       </div>
     </header>
   )

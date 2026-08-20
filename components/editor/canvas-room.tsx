@@ -5,21 +5,23 @@ import { ClientSideSuspense, LiveblocksProvider, RoomProvider } from "@liveblock
 import { ErrorBoundary } from "react-error-boundary"
 
 import { Canvas, type CanvasHandle } from "@/components/editor/canvas"
+import type { CanvasSaveStatus } from "@/hooks/use-canvas-autosave"
 
 interface CanvasRoomProps {
   roomId: string
+  onSaveStatusChange?: (status: CanvasSaveStatus) => void
 }
 
 export const CanvasRoom = forwardRef<CanvasHandle, CanvasRoomProps>(function CanvasRoom(
-  { roomId },
+  { roomId, onSaveStatusChange },
   ref
 ) {
   return (
     <LiveblocksProvider authEndpoint="/api/liveblocks-auth">
-      <RoomProvider id={roomId} initialPresence={{ cursor: null, isThinking: false }}>
+      <RoomProvider id={roomId} initialPresence={{ cursor: null, thinking: false }}>
         <ErrorBoundary fallback={<CanvasConnectionError />}>
           <ClientSideSuspense fallback={<CanvasLoading />}>
-            <Canvas ref={ref} />
+            <Canvas ref={ref} onSaveStatusChange={onSaveStatusChange} />
           </ClientSideSuspense>
         </ErrorBoundary>
       </RoomProvider>
