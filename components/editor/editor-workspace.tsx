@@ -20,8 +20,14 @@ export const EditorWorkspace = forwardRef<CanvasHandle, EditorWorkspaceProps>(
   ) {
     return (
       <div className="flex flex-1 overflow-hidden">
-        <CanvasRoom ref={ref} roomId={project.id} onSaveStatusChange={onSaveStatusChange} />
-        <AiSidebar isOpen={isAiSidebarOpen} onClose={onCloseAiSidebar} />
+        <CanvasRoom ref={ref} roomId={project.id} onSaveStatusChange={onSaveStatusChange}>
+          <AiSidebar
+            isOpen={isAiSidebarOpen}
+            onClose={onCloseAiSidebar}
+            projectId={project.id}
+            roomId={project.id}
+          />
+        </CanvasRoom>
       </div>
     )
   }

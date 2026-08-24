@@ -1,4 +1,6 @@
-import { FileText, Ghost, Share2, Sparkles } from "lucide-react"
+import { FileText, Network, Share2, Sparkles } from "lucide-react"
+
+import { APP_NAME } from "@/lib/branding"
 
 const FEATURES = [
   {
@@ -40,9 +42,9 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         <div className="relative flex items-center gap-2">
           <span className="flex size-7 items-center justify-center rounded-md bg-brand">
-            <Ghost className="size-4 text-[var(--bg-base)]" />
+            <Network className="size-4 text-[var(--bg-base)]" />
           </span>
-          <span className="text-sm font-semibold text-copy-primary">Ghost AI</span>
+          <span className="text-sm font-semibold text-copy-primary">{APP_NAME}</span>
         </div>
 
         <div className="relative flex flex-col gap-10">
@@ -51,8 +53,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
               Design systems at the speed of thought.
             </h1>
             <p className="max-w-md text-base text-copy-muted">
-              Describe your architecture in plain English. Ghost AI maps it to a
-              shared canvas your whole team can refine in real time.
+              Describe your architecture in plain English. {APP_NAME} maps it
+              to a shared canvas your whole team can refine in real time.
             </p>
           </div>
 
@@ -74,7 +76,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         <p className="relative text-xs text-copy-faint">
-          © 2026 Ghost AI. All rights reserved.
+          © 2026 {APP_NAME}. All rights reserved.
         </p>
       </div>
 
