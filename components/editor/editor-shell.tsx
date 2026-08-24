@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 
 import type { CanvasHandle } from "@/components/editor/canvas"
 import { EditorHome } from "@/components/editor/editor-home"
@@ -31,8 +31,30 @@ export function EditorShell({
   const [isAiSidebarOpen, setIsAiSidebarOpen] = useState(false)
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<CanvasSaveStatus>("idle")
+  // Tracks which project a save status belongs to, since switching projects
+  // remounts EditorWorkspace (key={activeProject.id}) and its autosave state
+  // resets asynchronously - without the id check, a prior project's "Saved"
+  // or "Error" could render for the newly active project until the new
+  // workspace's own status catches up.
+  const [saveState, setSaveState] = useState<{
+    projectId: string
+    status: CanvasSaveStatus
+  } | null>(null)
+  const saveStatus: CanvasSaveStatus =
+    saveState && saveState.projectId === activeProject?.id ? saveState.status : "idle"
   const canvasRef = useRef<CanvasHandle>(null)
+
+  // Stable across re-renders (only changes when the active project does) -
+  // Canvas's own effect depends on this callback's identity, so a fresh
+  // function every render would re-fire that effect every render too.
+  const activeProjectId = activeProject?.id
+  const handleSaveStatusChange = useCallback(
+    (status: CanvasSaveStatus) => {
+      if (!activeProjectId) return
+      setSaveState({ projectId: activeProjectId, status })
+    },
+    [activeProjectId]
+  )
 
   function handleImportTemplate(template: CanvasTemplate) {
     canvasRef.current?.importTemplate(template)
@@ -94,7 +116,7 @@ export function EditorShell({
             project={activeProject}
             isAiSidebarOpen={isAiSidebarOpen}
             onCloseAiSidebar={() => setIsAiSidebarOpen(false)}
-            onSaveStatusChange={setSaveStatus}
+            onSaveStatusChange={handleSaveStatusChange}
           />
         ) : (
           <EditorHome onCreateProject={openCreate} />

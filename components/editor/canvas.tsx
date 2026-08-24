@@ -130,14 +130,16 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
 
       try {
         const response = await fetch(`/api/projects/${room.id}/canvas`)
-        if (!cancelled && response.ok) {
-          const data = (await response.json()) as { nodes: CanvasNode[]; edges: CanvasEdge[] }
-          if (data.nodes.length > 0 || data.edges.length > 0) {
-            room.batch(() => {
-              onNodesChange(data.nodes.map((item) => ({ type: "add", item })))
-              onEdgesChange(data.edges.map((item) => ({ type: "add", item })))
-            })
-          }
+        if (cancelled || !response.ok) return
+
+        const data = (await response.json()) as { nodes: CanvasNode[]; edges: CanvasEdge[] }
+        if (cancelled || nodesRef.current.length > 0 || edgesRef.current.length > 0) return
+
+        if (data.nodes.length > 0 || data.edges.length > 0) {
+          room.batch(() => {
+            onNodesChange(data.nodes.map((item) => ({ type: "add", item })))
+            onEdgesChange(data.edges.map((item) => ({ type: "add", item })))
+          })
         }
       } catch {
         // A failed load just means the room stays empty - the user can still

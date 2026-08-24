@@ -22,9 +22,9 @@ declare global {
     };
 
     // Custom events, for useBroadcastEvent, useEventListener
-    // Example has two events, using a union
-    // | { type: "PLAY" }
-    // | { type: "REACTION"; emoji: "🔥" };
+    // AI activity is shared via the ai-status-feed Liveblocks feed instead
+    // (see types/tasks.ts) since feeds, unlike broadcast events, persist so
+    // participants who join after a status was published can still see it.
     RoomEvent: Record<string, never>;
 
     // Custom metadata set on threads, for useThreads, useCreateThread, etc.
