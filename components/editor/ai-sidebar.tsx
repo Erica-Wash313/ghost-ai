@@ -268,17 +268,17 @@ export function AiSidebar({ isOpen, onClose, projectId, roomId }: AiSidebarProps
   // The status feed's latest text (already published by trigger/design-agent.ts
   // before it returns) is used as the message content rather than run.output,
   // since fetching/rendering the final graph data is out of scope for this sidebar.
-  useRealtimeRun<typeof designAgentTask>(activeRun?.runId, {
+  const { error: designRunError } = useRealtimeRun<typeof designAgentTask>(activeRun?.runId, {
     accessToken: activeRun?.publicToken,
     enabled: activeRun !== null,
     skipColumns: ["payload", "output"],
     onComplete: (completedRun, err) => {
       const succeeded = completedRun.status === "COMPLETED" && !err
-      const content =
-        aiStatus?.text ??
-        (succeeded
-          ? `${APP_NAME} finished updating the canvas.`
-          : `${APP_NAME} couldn't complete that request.`)
+      const content = succeeded
+        ? (aiStatus?.text ?? `${APP_NAME} finished updating the canvas.`)
+        : aiStatus?.status === "error" && aiStatus.text
+          ? aiStatus.text
+          : `${APP_NAME} couldn't complete that request.`
 
       postChatMessage({
         senderId: AI_SENDER_ID,
@@ -292,10 +292,30 @@ export function AiSidebar({ isOpen, onClose, projectId, roomId }: AiSidebarProps
     },
   })
 
+  // useRealtimeRun's onComplete above doesn't fire for every failure mode -
+  // a subscription-level error (e.g. an expired/invalid public token) only
+  // surfaces through this separate `error` field, which would otherwise leave
+  // the input stuck disabled forever with no explanation. Guarded by runId so
+  // an error from a since-replaced subscription can't clear a newer run.
+  useEffect(() => {
+    if (!designRunError || !activeRun) return
+    const failedRunId = activeRun.runId
+    postChatMessage({
+      senderId: AI_SENDER_ID,
+      sender: AI_SENDER_NAME,
+      role: "assistant",
+      content: `${APP_NAME} couldn't complete that request.`,
+      timestamp: Date.now(),
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveRun((current) => (current?.runId === failedRunId ? null : current))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designRunError])
+
   // Mirrors the design-run tracker above, but for generate-spec runs: on
   // completion it refreshes the spec list instead of posting a chat message,
   // since spec generation has no chat feed of its own.
-  useRealtimeRun<typeof generateSpecTask>(activeSpecRun?.runId, {
+  const { error: specRunError } = useRealtimeRun<typeof generateSpecTask>(activeSpecRun?.runId, {
     accessToken: activeSpecRun?.publicToken,
     enabled: activeSpecRun !== null,
     skipColumns: ["payload", "output"],
@@ -313,6 +333,16 @@ export function AiSidebar({ isOpen, onClose, projectId, roomId }: AiSidebarProps
       setActiveSpecRun(null)
     },
   })
+
+  // Same reasoning as the design-run error effect above, mirrored for spec runs.
+  useEffect(() => {
+    if (!specRunError || !activeSpecRun) return
+    const failedRunId = activeSpecRun.runId
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGenerateSpecError(`${APP_NAME} couldn't generate a spec. Please try again.`)
+    setActiveSpecRun((current) => (current?.runId === failedRunId ? null : current))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [specRunError])
 
   async function triggerSpecAgent() {
     const specRes = await fetch("/api/ai/spec", {
@@ -358,7 +388,7 @@ export function AiSidebar({ isOpen, onClose, projectId, roomId }: AiSidebarProps
     const designRes = await fetch("/api/ai/design", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, roomId, projectId }),
+      body: JSON.stringify({ prompt, roomId, projectId, requestId: crypto.randomUUID() }),
     })
     if (!designRes.ok) throw new Error("Failed to start design run")
     const { runId } = (await designRes.json()) as { runId: string }

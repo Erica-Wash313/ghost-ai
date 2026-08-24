@@ -10,7 +10,16 @@ import { getLiveblocksClient } from "../lib/liveblocks"
 import { APP_NAME } from "../lib/branding"
 import { prisma } from "../lib/prisma"
 import { NODE_COLORS, NODE_SHAPES } from "../types/canvas"
-import { AI_STATUS_FEED_ID, aiChatFeedMessageSchema, type AiStatus } from "../types/tasks"
+import {
+  AI_STATUS_FEED_ID,
+  aiChatFeedMessageSchema,
+  MAX_SPEC_CHAT_MESSAGE_LENGTH,
+  MAX_SPEC_CHAT_MESSAGES,
+  MAX_SPEC_EDGES,
+  MAX_SPEC_LABEL_LENGTH,
+  MAX_SPEC_NODES,
+  type AiStatus,
+} from "../types/tasks"
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_AI_API_KEY })
 
@@ -20,7 +29,7 @@ const specNodeSchema = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   data: z.object({
-    label: z.string(),
+    label: z.string().max(MAX_SPEC_LABEL_LENGTH),
     color: z.enum(NODE_COLORS),
     shape: z.enum(NODE_SHAPES),
   }),
@@ -30,15 +39,19 @@ const specEdgeSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1),
   target: z.string().min(1),
-  data: z.object({ label: z.string() }),
+  data: z.object({ label: z.string().max(MAX_SPEC_LABEL_LENGTH) }),
+})
+
+const specChatMessageSchema = aiChatFeedMessageSchema.extend({
+  content: z.string().min(1).max(MAX_SPEC_CHAT_MESSAGE_LENGTH),
 })
 
 export const generateSpecPayloadSchema = z.object({
   projectId: z.string().min(1),
   roomId: z.string().min(1),
-  chatHistory: z.array(aiChatFeedMessageSchema),
-  nodes: z.array(specNodeSchema),
-  edges: z.array(specEdgeSchema),
+  chatHistory: z.array(specChatMessageSchema).max(MAX_SPEC_CHAT_MESSAGES),
+  nodes: z.array(specNodeSchema).max(MAX_SPEC_NODES),
+  edges: z.array(specEdgeSchema).max(MAX_SPEC_EDGES),
 })
 
 type GenerateSpecPayload = z.infer<typeof generateSpecPayloadSchema>
@@ -122,8 +135,8 @@ export const generateSpecTask = schemaTask({
     logger.log("Spec generation task started", { projectId, roomId })
 
     try {
-      await publishStatus(liveblocks, roomId, "start", `${APP_NAME} is reading the canvas...`)
-      await publishStatus(liveblocks, roomId, "processing", `${APP_NAME} is writing the spec...`)
+      await publishStatusSafely(liveblocks, roomId, "start", `${APP_NAME} is reading the canvas...`)
+      await publishStatusSafely(liveblocks, roomId, "processing", `${APP_NAME} is writing the spec...`)
 
       const { text } = await generateText({
         model: google("gemini-3.6-flash"),

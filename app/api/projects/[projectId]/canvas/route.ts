@@ -52,6 +52,54 @@ function parseCanvasBody(body: unknown): { nodes: CanvasNode[]; edges: CanvasEdg
   return { nodes, edges }
 }
 
+// Lenient counterpart to parseCanvasBody used for reads: a stored blob was
+// valid when written, but keeps individually recoverable elements readable
+// even if it later fails strict validation (e.g. after a schema tightening),
+// instead of dropping the user's entire canvas.
+function filterCanvasBody(body: unknown): { nodes: CanvasNode[]; edges: CanvasEdge[] } {
+  if (typeof body !== "object" || body === null) return { nodes: [], edges: [] }
+  const { nodes, edges } = body as { nodes?: unknown; edges?: unknown }
+
+  const validNodes = Array.isArray(nodes) ? nodes.filter(isCanvasNode) : []
+  const nodeIds = new Set(validNodes.map((node) => node.id))
+  const validEdges = Array.isArray(edges)
+    ? edges.filter(isCanvasEdge).filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+    : []
+
+  return { nodes: validNodes, edges: validEdges }
+}
+
+// Bounds the request body while it's being read, rather than trusting the
+// client-supplied content-length header - a request sent without one (e.g.
+// chunked transfer-encoding) would otherwise skip the size check entirely
+// and let request.json() buffer an unbounded body into memory.
+async function readJsonWithLimit(
+  request: NextRequest,
+  maxBytes: number
+): Promise<{ ok: true; body: unknown } | { ok: false }> {
+  const reader = request.body?.getReader()
+  if (!reader) return { ok: false }
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel()
+      return { ok: false }
+    }
+    chunks.push(value)
+  }
+
+  try {
+    return { ok: true, body: JSON.parse(Buffer.concat(chunks).toString("utf-8")) }
+  } catch {
+    return { ok: false }
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
@@ -69,13 +117,12 @@ export async function PUT(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0)
-  if (contentLength > MAX_REQUEST_BODY_BYTES) {
+  const bodyResult = await readJsonWithLimit(request, MAX_REQUEST_BODY_BYTES)
+  if (!bodyResult.ok) {
     return NextResponse.json({ error: "Invalid canvas data" }, { status: 400 })
   }
 
-  const body: unknown = await request.json().catch(() => null)
-  const canvas = parseCanvasBody(body)
+  const canvas = parseCanvasBody(bodyResult.body)
 
   if (!canvas) {
     return NextResponse.json({ error: "Invalid canvas data" }, { status: 400 })
@@ -131,7 +178,6 @@ export async function GET(
   const canvas: unknown = await new Response(blobResult.stream)
     .json()
     .catch(() => null)
-  const parsed = parseCanvasBody(canvas)
 
-  return NextResponse.json(parsed ?? { nodes: [], edges: [] })
+  return NextResponse.json(filterCanvasBody(canvas))
 }
