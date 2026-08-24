@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 import { logger, metadata, task } from "@trigger.dev/sdk"
-import { generateObject, NoObjectGeneratedError } from "ai"
+import { generateObject, NoObjectGeneratedError, TypeValidationError } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { mutateFlow, type MutableFlow } from "@liveblocks/react-flow/node"
 import { z } from "zod"
@@ -37,6 +37,11 @@ const PRESENCE_TTL_SECONDS = 30
 const PRESENCE_CLEAR_TTL_SECONDS = 2
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_AI_API_KEY })
+
+// Raw prompts and generated graph/validation payloads can carry sensitive
+// user content - keep them out of production logs by default and only emit
+// them when this is explicitly opted into for local debugging.
+const AI_DEBUG_LOGGING = process.env.AI_DEBUG_LOGGING === "true"
 
 // Position is deliberately two flat number fields, not a nested {x,y}
 // object. A nested object here reliably destabilized gemini-3.6-flash: one
@@ -338,7 +343,7 @@ export const designAgentTask = task({
     const { prompt, roomId } = payload
     const liveblocks = getLiveblocksClient()
 
-    logger.log("Design agent task started", { roomId, prompt })
+    logger.log("Design agent task started", { roomId, ...(AI_DEBUG_LOGGING ? { prompt } : {}) })
 
     try {
       await publishStatus(liveblocks, roomId, "start", `${APP_NAME} is reading the canvas...`)
@@ -388,15 +393,22 @@ export const designAgentTask = task({
       return { operationCount }
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
-        // The bare error only carries a generic "did not match schema"
-        // message - the actually useful diagnostics (what the model
-        // returned, and why it failed Zod validation) live on these two
-        // properties instead, and get lost if not logged explicitly.
+        // error.text (the model's raw output) and error.cause's validation
+        // value are effectively the generated graph and its raw payload -
+        // only safe to log behind the debug flag. issuePaths (just the
+        // Zod issue locations, not the values) is safe to always log.
+        const validationCause = error.cause
+        const issuePaths =
+          TypeValidationError.isInstance(validationCause) &&
+          validationCause.cause instanceof z.ZodError
+            ? validationCause.cause.issues.map((issue) => issue.path.join("."))
+            : undefined
+
         logger.error("Design agent task failed: model output did not match schema", {
           roomId,
-          text: error.text,
-          cause: error.cause,
           finishReason: error.finishReason,
+          issuePaths,
+          ...(AI_DEBUG_LOGGING ? { text: error.text, cause: error.cause } : {}),
         })
       } else {
         logger.error("Design agent task failed", { roomId, error })

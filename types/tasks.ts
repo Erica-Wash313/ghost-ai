@@ -43,3 +43,13 @@ export function parseAiChatFeedMessage(payload: unknown): AiChatFeedMessage | nu
   const result = aiChatFeedMessageSchema.safeParse(payload)
   return result.success ? result.data : null
 }
+
+// Bounds for spec-generation AI workload inputs, enforced identically at both
+// the dispatch boundary (app/api/ai/spec/route.ts) and the task boundary
+// (trigger/generate-spec.ts) so an oversized payload is rejected before it
+// reaches Gemini either way.
+export const MAX_SPEC_CHAT_MESSAGES = 200
+export const MAX_SPEC_CHAT_MESSAGE_LENGTH = 4000
+export const MAX_SPEC_NODES = 500
+export const MAX_SPEC_EDGES = 1000
+export const MAX_SPEC_LABEL_LENGTH = 500

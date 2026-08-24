@@ -119,6 +119,11 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
   // their in-progress work with a stale snapshot would be a real data-loss
   // bug, not just a redundant fetch.
   const [isLoadReady, setIsLoadReady] = useState(false)
+  // Set when the saved-canvas fetch fails or returns a non-ok response - the
+  // room stays empty, but a manual Save at this point would silently
+  // overwrite whatever was already persisted with that empty/incomplete
+  // state. Cleared by the effect below as soon as a real edit happens.
+  const [hasLoadFailed, setHasLoadFailed] = useState(false)
   useEffect(() => {
     let cancelled = false
 
@@ -130,7 +135,11 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
 
       try {
         const response = await fetch(`/api/projects/${room.id}/canvas`)
-        if (cancelled || !response.ok) return
+        if (cancelled) return
+        if (!response.ok) {
+          setHasLoadFailed(true)
+          return
+        }
 
         const data = (await response.json()) as { nodes: CanvasNode[]; edges: CanvasEdge[] }
         if (cancelled || nodesRef.current.length > 0 || edgesRef.current.length > 0) return
@@ -144,7 +153,9 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
       } catch {
         // A failed load just means the room stays empty - the user can still
         // work, and the next autosave (once isLoadReady is set below) will
-        // persist their fresh edits.
+        // persist their fresh edits. Manual saves stay blocked in the
+        // meantime via hasLoadFailed.
+        if (!cancelled) setHasLoadFailed(true)
       } finally {
         if (!cancelled) setIsLoadReady(true)
       }
@@ -159,6 +170,14 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room])
 
+  // Clears the manual-save block as soon as a real edit happens after a
+  // failed load - the failed-load path above never itself changes
+  // nodes/edges, so this only fires on genuine post-failure activity.
+  useEffect(() => {
+    if (hasLoadFailed) setHasLoadFailed(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges])
+
   const { status: saveStatus, save } = useCanvasAutosave({
     projectId: room.id,
     nodes,
@@ -168,6 +187,15 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
   useEffect(() => {
     onSaveStatusChange?.(saveStatus)
   }, [saveStatus, onSaveStatusChange])
+
+  // Rejects a manual Save while hasLoadFailed is set, instead of letting it
+  // silently overwrite the persisted canvas with the room's still-incomplete
+  // state. Autosave doesn't need the same guard - it only ever fires once
+  // nodes/edges actually change, which is exactly what clears the block.
+  const manualSave = useCallback(async () => {
+    if (hasLoadFailed) return
+    await save()
+  }, [hasLoadFailed, save])
 
   // useLiveblocksFlow's onConnect builds new edges with @xyflow/react's plain
   // `addEdge`, which doesn't apply defaultEdgeOptions — so a freshly connected
@@ -321,7 +349,7 @@ const CanvasContent = forwardRef<CanvasHandle, CanvasProps>(function CanvasConte
     [fitView, onEdgesChange, onNodesChange, room]
   )
 
-  useImperativeHandle(ref, () => ({ importTemplate, save }), [importTemplate, save])
+  useImperativeHandle(ref, () => ({ importTemplate, save: manualSave }), [importTemplate, manualSave])
 
   return (
     <div

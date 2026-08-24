@@ -1,12 +1,12 @@
-Implement the full AI design agent so a user prompt results in real-time updates on the collaborative canvas, with visible AI presence and status.a
+Implement the full AI design agent so a user prompt results in real-time updates on the collaborative canvas, with visible AI presence and status.
 
 ## Implementation
 
 1. Update the design agent task in `trigger/design-agent.ts`.
 
    Before implementing:
-   - check `context/project-overview.md` and `context/architecture-context.md` for product behavior and system rules
-     -Before implementing, check Liveblocks and Trigger.dev agent skills for current patterns on canvas mutation and background task execution.
+   - check `context/project-overview.md` and `context/architecture.md` for product behavior and system rules
+   - check Liveblocks and Trigger.dev agent skills for current patterns on canvas mutation and background task execution
    - follow the existing Trigger.dev setup and agent patterns already in the project
    - reuse existing Liveblocks flow and presence patterns instead of creating new ones
 
@@ -35,7 +35,7 @@ Implement the full AI design agent so a user prompt results in real-time updates
    - clear AI presence when the task finishes
 
 ## Dependencies
-   All packages are already installed.`GEMINI_API_KEY` is already in `.env.local`.
+   All packages are already installed.
 
 ## Scope Limits
 

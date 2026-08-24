@@ -1,12 +1,19 @@
 import { auth } from "@clerk/nextjs/server"
 import { NextRequest, NextResponse } from "next/server"
-import { tasks } from "@trigger.dev/sdk"
+import { runs, tasks } from "@trigger.dev/sdk"
 import { z } from "zod"
 
 import { checkProjectAccess, getCurrentIdentity } from "@/lib/project-access"
 import { prisma } from "@/lib/prisma"
 import { NODE_COLORS, NODE_SHAPES } from "@/types/canvas"
-import { aiChatFeedMessageSchema } from "@/types/tasks"
+import {
+  aiChatFeedMessageSchema,
+  MAX_SPEC_CHAT_MESSAGE_LENGTH,
+  MAX_SPEC_CHAT_MESSAGES,
+  MAX_SPEC_EDGES,
+  MAX_SPEC_LABEL_LENGTH,
+  MAX_SPEC_NODES,
+} from "@/types/tasks"
 import type { generateSpecTask } from "@/trigger/generate-spec"
 
 const specNodeSchema = z.object({
@@ -15,7 +22,7 @@ const specNodeSchema = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   data: z.object({
-    label: z.string(),
+    label: z.string().max(MAX_SPEC_LABEL_LENGTH),
     color: z.enum(NODE_COLORS),
     shape: z.enum(NODE_SHAPES),
   }),
@@ -25,14 +32,18 @@ const specEdgeSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1),
   target: z.string().min(1),
-  data: z.object({ label: z.string() }),
+  data: z.object({ label: z.string().max(MAX_SPEC_LABEL_LENGTH) }),
+})
+
+const specChatMessageSchema = aiChatFeedMessageSchema.extend({
+  content: z.string().min(1).max(MAX_SPEC_CHAT_MESSAGE_LENGTH),
 })
 
 const triggerSpecBodySchema = z.object({
   roomId: z.string().min(1),
-  chatHistory: z.array(aiChatFeedMessageSchema),
-  nodes: z.array(specNodeSchema),
-  edges: z.array(specEdgeSchema),
+  chatHistory: z.array(specChatMessageSchema).max(MAX_SPEC_CHAT_MESSAGES),
+  nodes: z.array(specNodeSchema).max(MAX_SPEC_NODES),
+  edges: z.array(specEdgeSchema).max(MAX_SPEC_EDGES),
 })
 
 export async function POST(request: NextRequest) {
@@ -63,13 +74,18 @@ export async function POST(request: NextRequest) {
     edges,
   })
 
-  await prisma.taskRun.create({
-    data: {
-      runId: handle.id,
-      projectId: access.project.id,
-      userId,
-    },
-  })
+  try {
+    await prisma.taskRun.create({
+      data: {
+        runId: handle.id,
+        projectId: access.project.id,
+        userId,
+      },
+    })
+  } catch (error) {
+    await runs.cancel(handle.id).catch(() => {})
+    throw error
+  }
 
   return NextResponse.json({ runId: handle.id })
 }

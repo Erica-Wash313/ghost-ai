@@ -40,7 +40,9 @@ Define a `generateSpec` task that:
 - uses Gemini through `@ai-sdk/google`
 - generates a Markdown technical spec from the canvas and chat context
 - updates run metadata/status for realtime tracking
-- returns the generated spec content as task output
+- stores the generated Markdown in Blob and creates a `ProjectSpec` record
+  for it, then returns `{ specId }` as task output (see
+  `28-spec-persistence-download.md` for the persistence flow)
 
 Follow the existing Trigger.dev task patterns in the codebase for retries, logging, and error handling.
 
@@ -48,7 +50,6 @@ Follow the existing Trigger.dev task patterns in the codebase for retries, loggi
 
 - Do not add frontend logic
 - Do not create spec editor UI
-- Do not store the final spec in this unit
 - Do not derive access from client-provided project IDs
 - Do not create a new AI provider abstraction
 - Do not change existing canvas or chat data models
@@ -59,7 +60,8 @@ Follow the existing Trigger.dev task patterns in the codebase for retries, loggi
 - Use Zod for request/task input validation
 - Use Prisma for `TaskRun` persistence
 - Project access must come from the authenticated user + `roomId`
-- Keep the task output as plain Markdown
+- Persist the generated Markdown to Blob and a `ProjectSpec` record; the task
+  output is `{ specId }`, not the Markdown itself
 - Reuse existing auth, Prisma, Trigger.dev, and Gemini patterns
 
 ### Check When Done
@@ -67,5 +69,5 @@ Follow the existing Trigger.dev task patterns in the codebase for retries, loggi
 - `POST /api/ai/spec` validates input and returns a `runId`
 - A `TaskRun` record is created for the authenticated user
 - `POST /api/ai/spec/token` only returns a token for the run owner
-- `generate-spec` runs through Trigger.dev and returns Markdown output
+- `generate-spec` runs through Trigger.dev, persists the spec, and returns `{ specId }`
 - TypeScript and build pass
